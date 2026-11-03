@@ -7,7 +7,7 @@ export const APP_VERSION = '0.9.5';
 export const APP_CODENAME = 'Patchkabel';
 
 // Name of the service-worker cache that ships with this version (must equal CACHE_NAME in sw.js).
-export const EXPECTED_CACHE = 'rackbuilder-v17';
+export const EXPECTED_CACHE = 'rackbuilder-v18';
 export const CACHE_PREFIX = 'rackbuilder-v';
 
 /**

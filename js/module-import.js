@@ -12,7 +12,7 @@ import {
 import {
   cleanTable, analyzeCsv, buildModuleImportRows, buildInterfaceRename, readInterfaceTable,
   expectedInterfaces, MODULE_IMPORT_HEADERS, INTERFACE_RENAME_HEADERS,
-  buildDeviceImportRows, deviceImportHeaders, missingDeviceFields,
+  buildDeviceImportRows, deviceImportHeaders, missingDeviceFields, expectedPorts,
 } from './import-engine.js';
 import { getModuleTypes, getDeviceTypes, getRoles, getManufacturers, getApiCredentials, apiFetchPages } from './netbox-autocomplete.js';
 
@@ -203,6 +203,20 @@ function renderGeneral(d) {
       ${selectHtml(Object.keys(PORT_KIND_SETS), d.port_kind, 'data-k="port_kind" data-rerender="1"', k => t('mi_pk_set_' + k))}</div>
     ${(PORT_KIND_SETS[d.port_kind] || []).map(kind => `<div class="form-group"><label>${esc(t('mi_ed_tpl_' + kind))}</label>
       <input type="text" data-k="${PORT_KINDS[kind].template}" value="${esc(d[PORT_KINDS[kind].template])}"></div>`).join('')}
+    <div class="form-group"><label>${esc(t('mi_ed_outlet_rename'))}</label>
+      ${selectHtml(['yes', 'no'], d.rename_outlets, 'data-k="rename_outlets" data-rerender="1"', o => t('mi_opt_' + o))}</div>
+    ${d.rename_outlets === 'yes' ? `
+    <div class="form-group"><label>${esc(t('mi_ed_tpl_power_outlet'))}</label>
+      <input type="text" data-k="power_outlet_name_template" value="${esc(d.power_outlet_name_template)}"></div>
+    <div class="form-group"><label>${esc(t('mi_ed_outlet_pattern'))}</label>
+      <input type="text" data-k="power_outlet_name_pattern" value="${esc(d.power_outlet_name_pattern)}"></div>
+    <div class="form-row">
+      <div class="form-group"><label>${esc(t('mi_ed_outlet_label_white'))}</label>
+        <input type="text" data-k="outlet_label_white" value="${esc(d.outlet_label_white)}"></div>
+      <div class="form-group"><label>${esc(t('mi_ed_outlet_label_orange'))}</label>
+        <input type="text" data-k="outlet_label_orange" value="${esc(d.outlet_label_orange)}"></div>
+    </div>
+    <p class="settings-section-desc">${esc(t('mi_ed_outlet_pattern_hint'))}</p>` : ''}
     <p class="settings-section-desc">${esc(t('mi_ed_iface_hint'))}</p>`;
 }
 
@@ -492,7 +506,9 @@ function renderExport() {
 // ─── Step 4: port IDs (front ports, rear ports or interfaces) ────────────────
 
 function portKinds() {
-  return PORT_KIND_SETS[activeProfile().port_kind] || PORT_KIND_SETS.front_rear;
+  const p = activeProfile();
+  const kinds = PORT_KIND_SETS[p.port_kind] || PORT_KIND_SETS.front_rear;
+  return p.rename_outlets === 'yes' ? [...kinds, 'power_outlet'] : kinds;
 }
 
 function renderKinds() {
@@ -526,7 +542,7 @@ function applyPorts(kind, items) {
 }
 
 function renderInterfaceStep() {
-  const none = expectedInterfaces(S.analysis.devices, activeProfile()).length === 0;
+  const none = !portKinds().some(k => expectedPorts(S.analysis.devices, activeProfile(), k).length);
   $('mi-if-none').hidden = !none;
   $('mi-if-actions').hidden = none;
   $('mi-if-kinds').hidden = none;
@@ -536,7 +552,7 @@ function renderInterfaceStep() {
 async function fetchPortsFromApi() {
   const { baseUrl, token } = await getApiCredentials();
   if (!baseUrl || !token) { uiAlert(t('netbox_api_missing_creds')); return; }
-  const names = [...new Set(expectedInterfaces(S.analysis.devices, activeProfile()).map(e => e.device))];
+  const devicesFor = kind => [...new Set(expectedPorts(S.analysis.devices, activeProfile(), kind).map(e => e.device))];
   const btn = $('mi-if-api-btn');
   const orig = btn.textContent;
   btn.disabled = true;
@@ -544,6 +560,7 @@ async function fetchPortsFromApi() {
   try {
     for (const kind of portKinds()) {
       const all = [];
+      const names = devicesFor(kind);
       for (let i = 0; i < names.length; i += 20) {
         const query = names.slice(i, i + 20).map(n => `device=${encodeURIComponent(n)}`).join('&');
         const items = await apiFetchPages(baseUrl, token, PORT_KINDS[kind].endpoint, query);

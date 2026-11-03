@@ -3970,6 +3970,18 @@ const translations = {
     mi_ed_slots: 'Module bays',
     mi_ed_role: 'Device role',
     mi_ed_manufacturer: 'Manufacturer',
+    mi_opt_yes: 'Yes',
+    mi_opt_no: 'No',
+    mi_ed_outlet_rename: 'Rename power outlets',
+    mi_ed_tpl_power_outlet: 'Power outlet name template ({module} = bay position, {n} = outlet number in the module)',
+    mi_ed_outlet_pattern: 'New power outlet name',
+    mi_ed_outlet_label_white: 'Label for white',
+    mi_ed_outlet_label_orange: 'Label for orange',
+    mi_ed_outlet_pattern_hint: 'Placeholders for the new name: {color} (label above), {n} (running number per color across all modules of the device, e.g. Steckdose Weiß 1, 2, 3 …), {module} (bay position), {m} (number within the module). The template above must match what NetBox generates from the module type.',
+    mi_pk_power_outlet: 'Power outlets',
+    mi_val_outlet_pattern_required: 'The new power outlet name is required.',
+    mi_val_outlet_pattern_invalid: 'Power outlet name: unknown placeholder {placeholder}.',
+    mi_val_outlet_pattern_no_number: 'Power outlet name needs {n}, otherwise the outlets get the same name.',
     mi_ed_port_kind: 'LAN ports in NetBox are …',
     mi_pk_set_front_rear: 'Front and rear ports',
     mi_pk_set_front_port: 'Front ports only',
@@ -4415,6 +4427,18 @@ const translations = {
     mi_ed_slots: 'Modul-Bays',
     mi_ed_role: 'Geräterolle',
     mi_ed_manufacturer: 'Hersteller',
+    mi_opt_yes: 'Ja',
+    mi_opt_no: 'Nein',
+    mi_ed_outlet_rename: 'Steckdosen umbenennen',
+    mi_ed_tpl_power_outlet: 'Steckdosen-Namensvorlage ({module} = Bay-Position, {n} = Steckdosennummer im Modul)',
+    mi_ed_outlet_pattern: 'Neuer Steckdosenname',
+    mi_ed_outlet_label_white: 'Bezeichnung für Weiß',
+    mi_ed_outlet_label_orange: 'Bezeichnung für Orange',
+    mi_ed_outlet_pattern_hint: 'Platzhalter für den neuen Namen: {color} (Bezeichnung oben), {n} (laufende Nummer pro Farbe über alle Module des Geräts, z. B. Steckdose Weiß 1, 2, 3 …), {module} (Bay-Position), {m} (Nummer im Modul). Die Vorlage oben muss zu dem passen, was NetBox aus dem Modultyp erzeugt.',
+    mi_pk_power_outlet: 'Steckdosen',
+    mi_val_outlet_pattern_required: 'Der neue Steckdosenname ist erforderlich.',
+    mi_val_outlet_pattern_invalid: 'Steckdosenname: unbekannter Platzhalter {placeholder}.',
+    mi_val_outlet_pattern_no_number: 'Der Steckdosenname braucht {n}, sonst bekommen die Steckdosen denselben Namen.',
     mi_ed_port_kind: 'LAN-Ports sind in NetBox …',
     mi_pk_set_front_rear: 'Front- und Rear-Ports',
     mi_pk_set_front_port: 'Nur Front-Ports',
@@ -8015,6 +8039,11 @@ function createEmptyProfile(name = 'New profile') {
     port_kind: 'front_rear',
     front_port_name_template: 'Gi{module}/0/{n}',
     rear_port_name_template: 'Gi{module}/0/{n}',
+    rename_outlets: 'yes',
+    power_outlet_name_template: 'Outlet {module}.{n}',
+    power_outlet_name_pattern: 'Steckdose {color} {n}',
+    outlet_label_white: 'Weiß',
+    outlet_label_orange: 'Orange',
     lan_layout: '2',
     lan_fill_name: 'unknown',
     created_at: new Date().toISOString(),
@@ -8066,12 +8095,15 @@ function createSeedProfile() {
 const LAN_LAYOUTS = ['2', '3', 'custom'];
 
 const DEFAULT_PORT_TEMPLATE = 'Gi{module}/0/{n}';
+const DEFAULT_OUTLET_TEMPLATE = 'Outlet {module}.{n}';
+const DEFAULT_OUTLET_PATTERN = 'Steckdose {color} {n}';
 
 /** NetBox objects the LAN ports of a module can be: API endpoint, the profile field with the expected-name template, export file name. */
 const PORT_KINDS = {
   interface:  { endpoint: 'dcim/interfaces',  template: 'interface_name_template',  file: 'interface-rename.csv' },
   front_port: { endpoint: 'dcim/front-ports', template: 'front_port_name_template', file: 'front-port-rename.csv' },
   rear_port:  { endpoint: 'dcim/rear-ports',  template: 'rear_port_name_template',  file: 'rear-port-rename.csv' },
+  power_outlet: { endpoint: 'dcim/power-outlets', template: 'power_outlet_name_template', file: 'power-outlet-rename.csv' },
 };
 
 /** Profile choice `port_kind` → the kinds that get a rename file. */
@@ -8093,6 +8125,11 @@ function normalizeProfile(p) {
   if (p.device_status === undefined) p.device_status = 'active';
   if (p.port_kind === undefined) p.port_kind = 'front_rear';
   for (const k of ['front_port_name_template', 'rear_port_name_template']) if (p[k] === undefined) p[k] = p.interface_name_template || DEFAULT_PORT_TEMPLATE;
+  if (p.rename_outlets === undefined) p.rename_outlets = 'yes';
+  if (p.power_outlet_name_template === undefined) p.power_outlet_name_template = DEFAULT_OUTLET_TEMPLATE;
+  if (p.power_outlet_name_pattern === undefined) p.power_outlet_name_pattern = DEFAULT_OUTLET_PATTERN;
+  if (p.outlet_label_white === undefined) p.outlet_label_white = 'Weiß';
+  if (p.outlet_label_orange === undefined) p.outlet_label_orange = 'Orange';
   return p;
 }
 
@@ -8174,6 +8211,15 @@ function validateProfile(profile, knownModuleTypes = []) {
   if (!Number.isInteger(slots) || slots < 1 || slots > 99) err('slot_count_invalid');
   if (!SPLIT_STRATEGIES.includes(profile.default_split_strategy)) err('strategy_invalid');
   if (!Object.hasOwn(PORT_KIND_SETS, profile.port_kind)) err('port_kind_invalid');
+  if (profile.rename_outlets === 'yes') {
+    const pat = String(profile.power_outlet_name_pattern || '').trim();
+    if (!pat) err('outlet_pattern_required');
+    else {
+      const bad = [...pat.matchAll(/\{([^}]*)\}/g)].map(m => m[1]).find(k => !['color', 'n', 'module', 'm'].includes(k));
+      if (bad !== undefined) err('outlet_pattern_invalid', { placeholder: `{${bad}}` });
+      else if (!pat.includes('{n}')) err('outlet_pattern_no_number');
+    }
+  }
   if (!LAN_LAYOUTS.includes(profile.lan_layout)) err('lan_layout_invalid');
   else if (profile.lan_layout !== 'custom') {
     if (!String(profile.lan_fill_name ?? '').trim()) err('lan_fill_required');
@@ -8734,6 +8780,7 @@ function buildDeviceImportRows(devices, profile) {
  * @returns {Array<{device:string, bay:number, expected:string, newName:string}>}
  */
 function expectedPorts(devices, profile, kind = 'interface') {
+  if (kind === 'power_outlet') return expectedOutlets(devices, profile);
   const template = profile[PORT_KINDS[kind].template] || DEFAULT_PORT_TEMPLATE;
   const out = [];
   for (const d of devices) {
@@ -8747,6 +8794,34 @@ function expectedPorts(devices, profile, kind = 'interface') {
           newName: portName,
         });
       });
+    }
+  }
+  return out;
+}
+
+/**
+ * Power outlets NetBox will create for the power modules. The new name comes from the profile's pattern
+ * (`{color}`, `{n}` = running number per color across the whole device, `{module}`, `{m}` = number in the module).
+ * @returns {Array<{device:string, bay:number, expected:string, newName:string}>}
+ */
+function expectedOutlets(devices, profile) {
+  const template = profile.power_outlet_name_template || DEFAULT_OUTLET_TEMPLATE;
+  const pattern = profile.power_outlet_name_pattern || DEFAULT_OUTLET_PATTERN;
+  const labels = { white: profile.outlet_label_white ?? 'Weiß', orange: profile.outlet_label_orange ?? 'Orange' };
+  const out = [];
+  for (const d of devices) {
+    const counters = {};
+    for (const b of d.bays) {
+      if (!b || b.category !== 'Strom') continue;
+      for (let m = 1; m <= b.size; m++) {
+        counters[b.color] = (counters[b.color] || 0) + 1;
+        out.push({
+          device: d.name,
+          bay: b.bay,
+          expected: fillPattern(template, { module: b.bay, n: m }),
+          newName: fillPattern(pattern, { color: labels[b.color] ?? b.color, n: counters[b.color], module: b.bay, m }),
+        });
+      }
     }
   }
   return out;
@@ -8987,6 +9062,20 @@ function renderGeneral(d) {
       ${selectHtml(Object.keys(PORT_KIND_SETS), d.port_kind, 'data-k="port_kind" data-rerender="1"', k => t('mi_pk_set_' + k))}</div>
     ${(PORT_KIND_SETS[d.port_kind] || []).map(kind => `<div class="form-group"><label>${esc(t('mi_ed_tpl_' + kind))}</label>
       <input type="text" data-k="${PORT_KINDS[kind].template}" value="${esc(d[PORT_KINDS[kind].template])}"></div>`).join('')}
+    <div class="form-group"><label>${esc(t('mi_ed_outlet_rename'))}</label>
+      ${selectHtml(['yes', 'no'], d.rename_outlets, 'data-k="rename_outlets" data-rerender="1"', o => t('mi_opt_' + o))}</div>
+    ${d.rename_outlets === 'yes' ? `
+    <div class="form-group"><label>${esc(t('mi_ed_tpl_power_outlet'))}</label>
+      <input type="text" data-k="power_outlet_name_template" value="${esc(d.power_outlet_name_template)}"></div>
+    <div class="form-group"><label>${esc(t('mi_ed_outlet_pattern'))}</label>
+      <input type="text" data-k="power_outlet_name_pattern" value="${esc(d.power_outlet_name_pattern)}"></div>
+    <div class="form-row">
+      <div class="form-group"><label>${esc(t('mi_ed_outlet_label_white'))}</label>
+        <input type="text" data-k="outlet_label_white" value="${esc(d.outlet_label_white)}"></div>
+      <div class="form-group"><label>${esc(t('mi_ed_outlet_label_orange'))}</label>
+        <input type="text" data-k="outlet_label_orange" value="${esc(d.outlet_label_orange)}"></div>
+    </div>
+    <p class="settings-section-desc">${esc(t('mi_ed_outlet_pattern_hint'))}</p>` : ''}
     <p class="settings-section-desc">${esc(t('mi_ed_iface_hint'))}</p>`;
 }
 
@@ -9276,7 +9365,9 @@ function renderExport() {
 // ─── Step 4: port IDs (front ports, rear ports or interfaces) ────────────────
 
 function portKinds() {
-  return PORT_KIND_SETS[activeProfile().port_kind] || PORT_KIND_SETS.front_rear;
+  const p = activeProfile();
+  const kinds = PORT_KIND_SETS[p.port_kind] || PORT_KIND_SETS.front_rear;
+  return p.rename_outlets === 'yes' ? [...kinds, 'power_outlet'] : kinds;
 }
 
 function renderKinds() {
@@ -9310,7 +9401,7 @@ function applyPorts(kind, items) {
 }
 
 function renderInterfaceStep() {
-  const none = expectedInterfaces(S.analysis.devices, activeProfile()).length === 0;
+  const none = !portKinds().some(k => expectedPorts(S.analysis.devices, activeProfile(), k).length);
   $('mi-if-none').hidden = !none;
   $('mi-if-actions').hidden = none;
   $('mi-if-kinds').hidden = none;
@@ -9320,7 +9411,7 @@ function renderInterfaceStep() {
 async function fetchPortsFromApi() {
   const { baseUrl, token } = await getApiCredentials();
   if (!baseUrl || !token) { uiAlert(t('netbox_api_missing_creds')); return; }
-  const names = [...new Set(expectedInterfaces(S.analysis.devices, activeProfile()).map(e => e.device))];
+  const devicesFor = kind => [...new Set(expectedPorts(S.analysis.devices, activeProfile(), kind).map(e => e.device))];
   const btn = $('mi-if-api-btn');
   const orig = btn.textContent;
   btn.disabled = true;
@@ -9328,6 +9419,7 @@ async function fetchPortsFromApi() {
   try {
     for (const kind of portKinds()) {
       const all = [];
+      const names = devicesFor(kind);
       for (let i = 0; i < names.length; i += 20) {
         const query = names.slice(i, i + 20).map(n => `device=${encodeURIComponent(n)}`).join('&');
         const items = await apiFetchPages(baseUrl, token, PORT_KINDS[kind].endpoint, query);
@@ -10172,7 +10264,7 @@ const APP_VERSION = '0.9.5';
 const APP_CODENAME = 'Patchkabel';
 
 // Name of the service-worker cache that ships with this version (must equal CACHE_NAME in sw.js).
-const EXPECTED_CACHE = 'rackbuilder-v17';
+const EXPECTED_CACHE = 'rackbuilder-v18';
 const CACHE_PREFIX = 'rackbuilder-v';
 
 /**

@@ -35,6 +35,11 @@ export function createEmptyProfile(name = 'New profile') {
     port_kind: 'front_rear',
     front_port_name_template: 'Gi{module}/0/{n}',
     rear_port_name_template: 'Gi{module}/0/{n}',
+    rename_outlets: 'yes',
+    power_outlet_name_template: 'Outlet {module}.{n}',
+    power_outlet_name_pattern: 'Steckdose {color} {n}',
+    outlet_label_white: 'Weiß',
+    outlet_label_orange: 'Orange',
     lan_layout: '2',
     lan_fill_name: 'unknown',
     created_at: new Date().toISOString(),
@@ -86,12 +91,15 @@ export function createSeedProfile() {
 export const LAN_LAYOUTS = ['2', '3', 'custom'];
 
 export const DEFAULT_PORT_TEMPLATE = 'Gi{module}/0/{n}';
+export const DEFAULT_OUTLET_TEMPLATE = 'Outlet {module}.{n}';
+export const DEFAULT_OUTLET_PATTERN = 'Steckdose {color} {n}';
 
 /** NetBox objects the LAN ports of a module can be: API endpoint, the profile field with the expected-name template, export file name. */
 export const PORT_KINDS = {
   interface:  { endpoint: 'dcim/interfaces',  template: 'interface_name_template',  file: 'interface-rename.csv' },
   front_port: { endpoint: 'dcim/front-ports', template: 'front_port_name_template', file: 'front-port-rename.csv' },
   rear_port:  { endpoint: 'dcim/rear-ports',  template: 'rear_port_name_template',  file: 'rear-port-rename.csv' },
+  power_outlet: { endpoint: 'dcim/power-outlets', template: 'power_outlet_name_template', file: 'power-outlet-rename.csv' },
 };
 
 /** Profile choice `port_kind` → the kinds that get a rename file. */
@@ -113,6 +121,11 @@ export function normalizeProfile(p) {
   if (p.device_status === undefined) p.device_status = 'active';
   if (p.port_kind === undefined) p.port_kind = 'front_rear';
   for (const k of ['front_port_name_template', 'rear_port_name_template']) if (p[k] === undefined) p[k] = p.interface_name_template || DEFAULT_PORT_TEMPLATE;
+  if (p.rename_outlets === undefined) p.rename_outlets = 'yes';
+  if (p.power_outlet_name_template === undefined) p.power_outlet_name_template = DEFAULT_OUTLET_TEMPLATE;
+  if (p.power_outlet_name_pattern === undefined) p.power_outlet_name_pattern = DEFAULT_OUTLET_PATTERN;
+  if (p.outlet_label_white === undefined) p.outlet_label_white = 'Weiß';
+  if (p.outlet_label_orange === undefined) p.outlet_label_orange = 'Orange';
   return p;
 }
 
@@ -194,6 +207,15 @@ export function validateProfile(profile, knownModuleTypes = []) {
   if (!Number.isInteger(slots) || slots < 1 || slots > 99) err('slot_count_invalid');
   if (!SPLIT_STRATEGIES.includes(profile.default_split_strategy)) err('strategy_invalid');
   if (!Object.hasOwn(PORT_KIND_SETS, profile.port_kind)) err('port_kind_invalid');
+  if (profile.rename_outlets === 'yes') {
+    const pat = String(profile.power_outlet_name_pattern || '').trim();
+    if (!pat) err('outlet_pattern_required');
+    else {
+      const bad = [...pat.matchAll(/\{([^}]*)\}/g)].map(m => m[1]).find(k => !['color', 'n', 'module', 'm'].includes(k));
+      if (bad !== undefined) err('outlet_pattern_invalid', { placeholder: `{${bad}}` });
+      else if (!pat.includes('{n}')) err('outlet_pattern_no_number');
+    }
+  }
   if (!LAN_LAYOUTS.includes(profile.lan_layout)) err('lan_layout_invalid');
   else if (profile.lan_layout !== 'custom') {
     if (!String(profile.lan_fill_name ?? '').trim()) err('lan_fill_required');

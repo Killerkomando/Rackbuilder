@@ -8,7 +8,7 @@ import {
   analyzeCsv, cleanTable, composeSizes, parseNumeric, buildModuleImportRows,
   buildInterfaceRename, readInterfaceTable, expectedInterfaces,
   MODULE_IMPORT_HEADERS, INTERFACE_RENAME_HEADERS,
-  buildDeviceImportRows, deviceImportHeaders, missingDeviceFields, expectedPorts,
+  buildDeviceImportRows, deviceImportHeaders, missingDeviceFields, expectedPorts, expectedOutlets,
 } from '../js/import-engine.js';
 import {
   createSeedProfile, validateProfile, duplicateProfile, exportProfileJson, importProfileJson,
@@ -539,7 +539,7 @@ test('port kinds: default is front + rear ports, each with its own endpoint, tem
   assert.equal(PORT_KINDS.front_port.endpoint, 'dcim/front-ports');
   assert.equal(PORT_KINDS.rear_port.endpoint, 'dcim/rear-ports');
   assert.equal(PORT_KINDS.interface.endpoint, 'dcim/interfaces');
-  assert.equal(new Set(Object.values(PORT_KINDS).map(k => k.file)).size, 3);
+  assert.equal(new Set(Object.values(PORT_KINDS).map(k => k.file)).size, 4);
   assert.equal(createSeedProfile().port_kind, 'front_rear');
   const n = normalizeProfile({ splitRules: [], interface_name_template: 'X{module}-{n}' });
   assert.equal(n.port_kind, 'front_rear');
@@ -561,4 +561,49 @@ test('rename rows are built per port kind from that kind\'s template', () => {
   assert.equal(buildInterfaceRename([a], p, front, 'rear_port').rows.length, 0);
   // interfaces keep working as before
   assert.equal(expectedPorts([a], p, 'interface')[0].expected, 'Gi1/0/1');
+});
+
+// ── power outlets ──
+test('power outlets are renamed per color with a running number across the device', () => {
+  const a = devC('Raum 1, EG Bodentank A'); // 5 white (3+2) and 2 orange
+  const out = expectedOutlets([a], customProfile);
+  const white = out.filter(o => o.newName.startsWith('Steckdose Weiß'));
+  const orange = out.filter(o => o.newName.startsWith('Steckdose Orange'));
+  assert.deepEqual(white.map(o => o.newName), ['Steckdose Weiß 1', 'Steckdose Weiß 2', 'Steckdose Weiß 3', 'Steckdose Weiß 4', 'Steckdose Weiß 5']);
+  assert.deepEqual(orange.map(o => o.newName), ['Steckdose Orange 1', 'Steckdose Orange 2']);
+  assert.equal(out.length, 7);
+  // expected (NetBox generated) name uses the outlet template with the number inside the module
+  assert.ok(out.every(o => /^Outlet \d+\.\d+$/.test(o.expected)));
+  assert.equal(expectedPorts([a], customProfile, 'power_outlet').length, 7);
+});
+
+test('outlet pattern placeholders and labels are configurable', () => {
+  const a = devC('Raum 1, EG Bodentank A');
+  const p = { ...customProfile, power_outlet_name_pattern: '{color}-{n} (M{module}/{m})', outlet_label_white: 'W', outlet_label_orange: 'O' };
+  const out = expectedOutlets([a], p);
+  assert.equal(out[0].newName, 'W-1 (M' + out[0].bay + '/1)');
+  assert.ok(out.some(o => o.newName.startsWith('O-2')));
+});
+
+test('outlet rename rows match NetBox outlets by device and generated name', () => {
+  const a = devC('Raum 1, EG Bodentank A');
+  const exp = expectedOutlets([a], customProfile);
+  const netbox = exp.map((e, i) => ({ id: String(500 + i), device: e.device, name: e.expected }));
+  const r = buildInterfaceRename([a], customProfile, netbox, 'power_outlet');
+  assert.equal(r.rows.length, 7);
+  assert.equal(r.unmatched.length, 0);
+  assert.deepEqual(r.rows[0], { id: '500', name: 'Steckdose Weiß 1' });
+});
+
+test('outlet settings: defaults, normalization and validation', () => {
+  const seed = createSeedProfile();
+  assert.equal(seed.rename_outlets, 'yes');
+  assert.equal(seed.outlet_label_white, 'Weiß');
+  assert.equal(normalizeProfile({ splitRules: [] }).power_outlet_name_pattern, 'Steckdose {color} {n}');
+  const codes = p => validateProfile(p).errors.map(e => e.code);
+  assert.ok(!codes(seed).some(c => c.startsWith('outlet_')));
+  assert.ok(codes({ ...seed, power_outlet_name_pattern: '' }).includes('outlet_pattern_required'));
+  assert.ok(codes({ ...seed, power_outlet_name_pattern: 'Dose {x} {n}' }).includes('outlet_pattern_invalid'));
+  assert.ok(codes({ ...seed, power_outlet_name_pattern: 'Dose {color}' }).includes('outlet_pattern_no_number'));
+  assert.ok(!codes({ ...seed, rename_outlets: 'no', power_outlet_name_pattern: '' }).some(c => c.startsWith('outlet_')));
 });

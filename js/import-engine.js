@@ -1,7 +1,10 @@
 // NetBox module import engine: CSV table + profile → devices with module-bay assignments.
 // Pure logic (no DOM, no storage) so it can be tested in Node.
 
-import { moduleSizeFor, fillPattern, NAME_MODIFIERS, parsePlaceholder, PORT_KINDS, DEFAULT_PORT_TEMPLATE } from './import-profiles.js';
+import {
+  moduleSizeFor, fillPattern, NAME_MODIFIERS, parsePlaceholder, PORT_KINDS, DEFAULT_PORT_TEMPLATE,
+  DEFAULT_OUTLET_TEMPLATE, DEFAULT_OUTLET_PATTERN,
+} from './import-profiles.js';
 
 export const MODULE_IMPORT_HEADERS = ['device', 'module_bay', 'module_type', 'status', 'replicate_components'];
 export const DEVICE_IMPORT_BASE_HEADERS = ['name', 'role', 'manufacturer', 'device_type', 'site', 'status'];
@@ -424,6 +427,7 @@ export function buildDeviceImportRows(devices, profile) {
  * @returns {Array<{device:string, bay:number, expected:string, newName:string}>}
  */
 export function expectedPorts(devices, profile, kind = 'interface') {
+  if (kind === 'power_outlet') return expectedOutlets(devices, profile);
   const template = profile[PORT_KINDS[kind].template] || DEFAULT_PORT_TEMPLATE;
   const out = [];
   for (const d of devices) {
@@ -437,6 +441,34 @@ export function expectedPorts(devices, profile, kind = 'interface') {
           newName: portName,
         });
       });
+    }
+  }
+  return out;
+}
+
+/**
+ * Power outlets NetBox will create for the power modules. The new name comes from the profile's pattern
+ * (`{color}`, `{n}` = running number per color across the whole device, `{module}`, `{m}` = number in the module).
+ * @returns {Array<{device:string, bay:number, expected:string, newName:string}>}
+ */
+export function expectedOutlets(devices, profile) {
+  const template = profile.power_outlet_name_template || DEFAULT_OUTLET_TEMPLATE;
+  const pattern = profile.power_outlet_name_pattern || DEFAULT_OUTLET_PATTERN;
+  const labels = { white: profile.outlet_label_white ?? 'Weiß', orange: profile.outlet_label_orange ?? 'Orange' };
+  const out = [];
+  for (const d of devices) {
+    const counters = {};
+    for (const b of d.bays) {
+      if (!b || b.category !== 'Strom') continue;
+      for (let m = 1; m <= b.size; m++) {
+        counters[b.color] = (counters[b.color] || 0) + 1;
+        out.push({
+          device: d.name,
+          bay: b.bay,
+          expected: fillPattern(template, { module: b.bay, n: m }),
+          newName: fillPattern(pattern, { color: labels[b.color] ?? b.color, n: counters[b.color], module: b.bay, m }),
+        });
+      }
     }
   }
   return out;
