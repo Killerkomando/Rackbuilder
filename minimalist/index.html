@@ -2933,11 +2933,11 @@ dialog.ui-dialog:not([open]) { display: none; }
     </button>
     <div class="menu-wrap">
       <button type="button" class="app-version" id="version-btn" data-menu="version-menu" data-i18n-title="ver_chip_title" aria-haspopup="true" aria-expanded="false">
-        <span class="led led--ok"></span><span id="version-chip-text">v0.9.0</span>
+        <span class="led led--ok"></span><span id="version-chip-text">v0.9.5</span>
       </button>
       <div class="menu menu--version" id="version-menu" hidden>
         <div class="ver-title" data-i18n="ver_title">Loaded version</div>
-        <div class="ver-number mono" id="ver-number">v0.9.0</div>
+        <div class="ver-number mono" id="ver-number">v0.9.5</div>
         <dl class="ver-grid">
           <dt data-i18n="ver_source">Source</dt><dd id="ver-source"></dd>
           <dt data-i18n="ver_cache">Cache</dt><dd class="mono" id="ver-cache"></dd>
@@ -3243,7 +3243,7 @@ dialog.ui-dialog:not([open]) { display: none; }
 </main>
 
 <footer class="app-status" id="app-status">
-  <span class="status-item status-version"><span class="led led--ok"></span><span class="mono" id="status-version-text">v0.9.0</span></span>
+  <span class="status-item status-version"><span class="led led--ok"></span><span class="mono" id="status-version-text">v0.9.5</span></span>
   <span class="status-item mono" id="status-cache"></span>
   <span class="status-item" id="status-offline"></span>
   <span class="status-item" id="status-devices"></span>
@@ -10168,11 +10168,11 @@ function showToast(message, duration = 3000) {
 // Bump APP_VERSION here (and CACHE_NAME in sw.js plus EXPECTED_CACHE below) for every release.
 // testing/version.test.mjs checks that README, sw.js and minimalist/index.html agree with it.
 
-const APP_VERSION = '0.9.0';
+const APP_VERSION = '0.9.5';
 const APP_CODENAME = 'Patchkabel';
 
 // Name of the service-worker cache that ships with this version (must equal CACHE_NAME in sw.js).
-const EXPECTED_CACHE = 'rackbuilder-v16';
+const EXPECTED_CACHE = 'rackbuilder-v17';
 const CACHE_PREFIX = 'rackbuilder-v';
 
 /**
