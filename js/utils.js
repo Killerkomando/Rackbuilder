@@ -1,6 +1,17 @@
 // Utility helpers for Rack Builder
 
 /**
+ * Value of the NetBox `Authorization` header. v2 tokens (`nbt_<key>.<secret>`) use `Bearer`,
+ * v1 tokens use `Token`; a pasted full header value ("Bearer …" / "Token …") is kept as is.
+ */
+export function netboxAuthHeader(token) {
+  const v = String(token || '').trim();
+  if (/^(token|bearer)\s/i.test(v)) return v;
+  if (v.startsWith('nbt_')) return `Bearer ${v}`;
+  return `Token ${v}`;
+}
+
+/**
  * Generate a unique ID (UUID v4)
  */
 export function generateId() {

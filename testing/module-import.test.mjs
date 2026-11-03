@@ -15,6 +15,8 @@ import {
   loadProfiles, saveProfiles, PROFILES_KEY, expandSequence, normalizeProfile, NAME_MODIFIERS, parsePlaceholder,
 } from '../js/import-profiles.js';
 
+import { netboxAuthHeader } from '../js/utils.js';
+
 const dir = dirname(fileURLToPath(import.meta.url));
 let passed = 0;
 const test = (name, fn) => { fn(); passed++; console.log('ok -', name); };
@@ -521,4 +523,12 @@ test('unknown modifier is a validation error; modifiers do not hide a missing si
   assert.ok(codes({ ...profile, device_name_pattern: '{block|shout}' }).includes('device_name_modifier_invalid'));
   assert.ok(codes({ ...profile, device_name_pattern: '{site_abbr|upper}-{block}', site_abbr: '' }).includes('device_name_part_missing'));
   assert.ok(!codes({ ...profile, device_name_pattern: '{col:Raum|lower}-{block|upper}' }).some(c => c.startsWith('device_name')));
+});
+
+test('NetBox auth header: v2 tokens use Bearer, v1 tokens use Token, pasted headers are kept', () => {
+  assert.equal(netboxAuthHeader('nbt_AbC123.secretvalue'), 'Bearer nbt_AbC123.secretvalue');
+  assert.equal(netboxAuthHeader('  0123456789abcdef  '), 'Token 0123456789abcdef');
+  assert.equal(netboxAuthHeader('Bearer nbt_x.y'), 'Bearer nbt_x.y');
+  assert.equal(netboxAuthHeader('Token abc'), 'Token abc');
+  assert.equal(netboxAuthHeader(''), 'Token ');
 });

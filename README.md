@@ -78,7 +78,7 @@ Loads live data from a NetBox instance (uses the same API token as the main app)
 ### NetBox Autocomplete (Optional)
 
 - **NetBox Data Upload** — Upload exported Device Types, Roles, Manufacturers, and Module Types from NetBox (JSON, YAML, or CSV) in Settings to enable autocomplete; supports comma-, semicolon-, and tab-separated files
-- **NetBox Live API** — Alternatively connect directly to a running NetBox instance via URL + API token; test the connection and fetch Device Types, Roles, and Manufacturers with paginated API calls (no CORS proxy required when NetBox is on the same network)
+- **NetBox Live API** — Alternatively connect directly to a running NetBox instance via URL + API token (v1 tokens are sent as `Token …`, v2 tokens `nbt_<key>.<secret>` as `Bearer …`); test the connection and fetch Device Types, Roles, and Manufacturers with paginated API calls (no CORS proxy required when NetBox is on the same network)
 - **Encrypted API Token Storage** — The NetBox API token is encrypted with AES-256-GCM before being written to `localStorage`; the encryption key lives only in `sessionStorage` and is never persisted to disk
 - **Multi-Document YAML Support** — Supports the NetBox direct-export YAML format where multiple device types are separated by `---` document markers; each entry is parsed as an individual device type
 - **Modern Autocomplete Dropdown** — Custom-styled dropdown with fuzzy search, highlighted matches, keyboard navigation (Arrow Up/Down, Enter, Escape), and two-column layout showing name + slug. Dropdown is body-appended and repositions on scroll, so it is never clipped by sidebar overflow.

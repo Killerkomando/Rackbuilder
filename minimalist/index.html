@@ -7571,6 +7571,17 @@ function updateNetboxUploadStatus() {
 }
 
 function getModuleTypes() { return loadNetboxEntries(STORAGE_KEY_MODULE_TYPES); }
+/**
+ * Value of the NetBox `Authorization` header. v2 tokens (`nbt_<key>.<secret>`) use `Bearer`,
+ * v1 tokens use `Token`; a pasted full header value ("Bearer …" / "Token …") is kept as is.
+ */
+function netboxAuthHeader(token) {
+  const v = String(token || '').trim();
+  if (/^(token|bearer)\s/i.test(v)) return v;
+  if (v.startsWith('nbt_')) return `Bearer ${v}`;
+  return `Token ${v}`;
+}
+
 function getDeviceTypes() { return loadNetboxEntries(STORAGE_KEY_TYPES); }
 
 async function getApiCredentials() {
@@ -7584,7 +7595,7 @@ async function apiFetchPages(baseUrl, token, endpoint, query = '') {
   const results = [];
   let url = `${baseUrl.replace(/\/+$/, '')}/api/${endpoint}/?limit=200&format=json${query ? '&' + query : ''}`;
   while (url) {
-    const res = await fetch(url, { headers: { 'Authorization': `Token ${token}`, 'Accept': 'application/json' } });
+    const res = await fetch(url, { headers: { 'Authorization': netboxAuthHeader(token), 'Accept': 'application/json' } });
     if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
     const data = await res.json();
     results.push(...(data.results || []));
@@ -7700,7 +7711,7 @@ function initNetboxAutocomplete() {
     const btn = document.getElementById('netbox-api-test-btn');
     if (btn) btn.disabled = true;
     try {
-      const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/api/`, { headers: { 'Authorization': `Token ${token}`, 'Accept': 'application/json' } });
+      const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/api/`, { headers: { 'Authorization': netboxAuthHeader(token), 'Accept': 'application/json' } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       if (status) { status.textContent = t('netbox_api_connected'); status.className = 'netbox-api-conn-status success'; }
     } catch (err) {
@@ -10082,7 +10093,7 @@ const APP_VERSION = '0.9.0';
 const APP_CODENAME = 'Patchkabel';
 
 // Name of the service-worker cache that ships with this version (must equal CACHE_NAME in sw.js).
-const EXPECTED_CACHE = 'rackbuilder-v13';
+const EXPECTED_CACHE = 'rackbuilder-v14';
 const CACHE_PREFIX = 'rackbuilder-v';
 
 /**

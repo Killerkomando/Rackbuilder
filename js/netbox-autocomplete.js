@@ -4,7 +4,7 @@
 
 import { t } from './i18n.js';
 import { parseCsvTable } from './csv.js';
-import { uiAlert } from './utils.js';
+import { uiAlert, netboxAuthHeader } from './utils.js';
 
 const STORAGE_KEY_TYPES         = 'rackbuilder_netbox_device_types';
 const STORAGE_KEY_ROLES         = 'rackbuilder_netbox_roles';
@@ -492,7 +492,7 @@ export async function apiFetchPages(baseUrl, token, endpoint, query = '') {
   let url = `${baseUrl.replace(/\/+$/, '')}/api/${endpoint}/?limit=200&format=json${query ? '&' + query : ''}`;
   while (url) {
     const res = await fetch(url, {
-      headers: { 'Authorization': `Token ${token}`, 'Accept': 'application/json' },
+      headers: { 'Authorization': netboxAuthHeader(token), 'Accept': 'application/json' },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
     const data = await res.json();
@@ -647,7 +647,7 @@ export async function initNetboxAutocomplete() {
     if (btn) btn.disabled = true;
     try {
       const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/api/`, {
-        headers: { 'Authorization': `Token ${token}`, 'Accept': 'application/json' },
+        headers: { 'Authorization': netboxAuthHeader(token), 'Accept': 'application/json' },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       if (status) { status.textContent = t('netbox_api_connected'); status.className = 'netbox-api-conn-status success'; }
