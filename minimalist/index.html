@@ -3973,9 +3973,10 @@ const translations = {
     mi_ed_role: 'Device role',
     mi_ed_manufacturer: 'Manufacturer',
     mi_ed_site: 'Site',
-    mi_ed_location: 'Location (optional)',
+    mi_ed_location: 'Location (fixed, fallback)',
+    mi_ed_location_col: 'Location column (CSV column per device, e.g. room)',
     mi_ed_dev_status: 'Device status',
-    mi_ed_device_fields_hint: 'Device type, manufacturer, role and site are required for device-import.csv (NetBox cannot create devices without them).',
+    mi_ed_device_fields_hint: 'Device type, manufacturer, role and site are required for device-import.csv (NetBox cannot create devices without them). The location column writes each row\'s value as the device location; the location must already exist in NetBox under the site.',
     mi_ex_download_devices: 'Download device-import.csv',
     mi_ex_missing: 'device-import.csv is unavailable: the profile has no value for {fields}. Set it in the profile editor (General).',
     mi_ed_strategy: 'Default split strategy',
@@ -4395,9 +4396,10 @@ const translations = {
     mi_ed_role: 'Geräterolle',
     mi_ed_manufacturer: 'Hersteller',
     mi_ed_site: 'Standort (Site)',
-    mi_ed_location: 'Location (optional)',
+    mi_ed_location: 'Location (fest, Rückfall)',
+    mi_ed_location_col: 'Location-Spalte (CSV-Spalte pro Gerät, z. B. Raum)',
     mi_ed_dev_status: 'Gerätestatus',
-    mi_ed_device_fields_hint: 'Gerätetyp, Hersteller, Rolle und Site sind für device-import.csv erforderlich (NetBox legt Geräte sonst nicht an).',
+    mi_ed_device_fields_hint: 'Gerätetyp, Hersteller, Rolle und Site sind für device-import.csv erforderlich (NetBox legt Geräte sonst nicht an). Die Location-Spalte schreibt den Wert jeder Zeile als Location des Geräts; die Location muss in NetBox unter der Site bereits existieren.',
     mi_ex_download_devices: 'device-import.csv herunterladen',
     mi_ex_missing: 'device-import.csv nicht verfügbar: Im Profil fehlt ein Wert für {fields}. Im Profil-Editor (Allgemein) ergänzen.',
     mi_ed_strategy: 'Standard-Aufteilung',
@@ -7948,6 +7950,7 @@ function createEmptyProfile(name = 'New profile') {
     netbox_manufacturer: '',
     netbox_site: '',
     netbox_location: '',
+    location_column: '',
     device_status: 'active',
     default_split_strategy: 'largest_first',
     is_default: false,
@@ -7976,6 +7979,7 @@ function createSeedProfile() {
   const p = createEmptyProfile('NetBox Standard (12-Bay)');
   p.id = 'default-12bay';
   p.is_default = true;
+  p.location_column = 'Raum';
   p.blocks = [{
     id: generateId(),
     count_column: 'Anzahl Bodentanks',
@@ -8010,7 +8014,7 @@ const LAN_LAYOUTS = ['2', '3', 'custom'];
 function normalizeProfile(p) {
   if (p.lan_layout === undefined) p.lan_layout = (p.splitRules || []).length > 0 ? 'custom' : '2';
   if (p.lan_fill_name === undefined) p.lan_fill_name = 'unknown';
-  for (const k of ['netbox_role', 'netbox_manufacturer', 'netbox_site', 'netbox_location']) if (p[k] === undefined) p[k] = '';
+  for (const k of ['netbox_role', 'netbox_manufacturer', 'netbox_site', 'netbox_location', 'location_column']) if (p[k] === undefined) p[k] = '';
   if (p.device_status === undefined) p.device_status = 'active';
   return p;
 }
@@ -8356,6 +8360,9 @@ function analyzeCsv(table, profile) {
 
   const colPattern = field => (profile.columns || []).find(c => c.internal_field === field)?.column_suffix_pattern;
   const orderedRules = rulesInOrder(profile);
+  // Per-device NetBox location, taken from a CSV column (e.g. the room); the fixed profile location is the fallback.
+  const locationHeader = profile.location_column ? findHeader(profile.location_column) : null;
+  if (profile.location_column && !locationHeader) reportFile('column_missing', { column: profile.location_column });
 
   for (const block of profile.blocks || []) {
     const countHeader = findHeader(block.count_column);
@@ -8381,7 +8388,8 @@ function analyzeCsv(table, profile) {
       for (const blockId of seq.slice(0, n)) {
         const prefix = fillPattern(block.prefix_pattern, { block: blockId });
         const name = [rowName, prefix].filter(Boolean).join(' ');
-        const device = { name, rowIndex, block: blockId, bays: new Array(slots).fill(null), issues: [], warnings: [] };
+        const location = locationHeader ? (row[locationHeader] || '').trim() : '';
+        const device = { name, location, rowIndex, block: blockId, bays: new Array(slots).fill(null), issues: [], warnings: [] };
         const fail = (code, params, bay = null) => {
           const issue = { rowIndex, device: name, bay, code, params };
           errors.push(issue);
@@ -8551,9 +8559,9 @@ function buildModuleImportRows(devices, profile) {
   return rows;
 }
 
-/** Columns of `device-import.csv`; `location` only when the profile sets one. */
+/** Columns of `device-import.csv`; `location` only when the profile sets a fixed location or a location column. */
 function deviceImportHeaders(profile) {
-  return profile.netbox_location ? [...DEVICE_IMPORT_BASE_HEADERS, 'location'] : [...DEVICE_IMPORT_BASE_HEADERS];
+  return profile.netbox_location || profile.location_column ? [...DEVICE_IMPORT_BASE_HEADERS, 'location'] : [...DEVICE_IMPORT_BASE_HEADERS];
 }
 
 /** Required NetBox device columns the profile leaves empty (NetBox rejects the device import without them). */
@@ -8573,7 +8581,7 @@ function buildDeviceImportRows(devices, profile) {
       site: profile.netbox_site || '',
       status: profile.device_status || 'active',
     };
-    if (profile.netbox_location) row.location = profile.netbox_location;
+    if (profile.netbox_location || profile.location_column) row.location = d.location || profile.netbox_location || '';
     return row;
   });
 }
@@ -8805,6 +8813,8 @@ function renderGeneral(d) {
       <div class="form-group"><label>${esc(t('mi_ed_location'))}</label>
         <input type="text" data-k="netbox_location" value="${esc(d.netbox_location)}" autocomplete="off"></div>
     </div>
+    <div class="form-group"><label>${esc(t('mi_ed_location_col'))}</label>
+      <input type="text" data-k="location_column" list="mi-dl-headers" value="${esc(d.location_column)}" autocomplete="off"></div>
     <div class="form-group"><label>${esc(t('mi_ed_dev_status'))}</label>
       ${selectHtml(['active', 'planned', 'staged', 'offline', 'inventory', 'decommissioning'], d.device_status, 'data-k="device_status"')}</div>
     <p class="settings-section-desc">${esc(t('mi_ed_device_fields_hint'))}</p>
@@ -9984,7 +9994,7 @@ const APP_VERSION = '0.9.0';
 const APP_CODENAME = 'Patchkabel';
 
 // Name of the service-worker cache that ships with this version (must equal CACHE_NAME in sw.js).
-const EXPECTED_CACHE = 'rackbuilder-v10';
+const EXPECTED_CACHE = 'rackbuilder-v11';
 const CACHE_PREFIX = 'rackbuilder-v';
 
 /**

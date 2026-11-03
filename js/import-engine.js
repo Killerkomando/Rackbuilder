@@ -156,6 +156,9 @@ export function analyzeCsv(table, profile) {
 
   const colPattern = field => (profile.columns || []).find(c => c.internal_field === field)?.column_suffix_pattern;
   const orderedRules = rulesInOrder(profile);
+  // Per-device NetBox location, taken from a CSV column (e.g. the room); the fixed profile location is the fallback.
+  const locationHeader = profile.location_column ? findHeader(profile.location_column) : null;
+  if (profile.location_column && !locationHeader) reportFile('column_missing', { column: profile.location_column });
 
   for (const block of profile.blocks || []) {
     const countHeader = findHeader(block.count_column);
@@ -181,7 +184,8 @@ export function analyzeCsv(table, profile) {
       for (const blockId of seq.slice(0, n)) {
         const prefix = fillPattern(block.prefix_pattern, { block: blockId });
         const name = [rowName, prefix].filter(Boolean).join(' ');
-        const device = { name, rowIndex, block: blockId, bays: new Array(slots).fill(null), issues: [], warnings: [] };
+        const location = locationHeader ? (row[locationHeader] || '').trim() : '';
+        const device = { name, location, rowIndex, block: blockId, bays: new Array(slots).fill(null), issues: [], warnings: [] };
         const fail = (code, params, bay = null) => {
           const issue = { rowIndex, device: name, bay, code, params };
           errors.push(issue);
@@ -351,9 +355,9 @@ export function buildModuleImportRows(devices, profile) {
   return rows;
 }
 
-/** Columns of `device-import.csv`; `location` only when the profile sets one. */
+/** Columns of `device-import.csv`; `location` only when the profile sets a fixed location or a location column. */
 export function deviceImportHeaders(profile) {
-  return profile.netbox_location ? [...DEVICE_IMPORT_BASE_HEADERS, 'location'] : [...DEVICE_IMPORT_BASE_HEADERS];
+  return profile.netbox_location || profile.location_column ? [...DEVICE_IMPORT_BASE_HEADERS, 'location'] : [...DEVICE_IMPORT_BASE_HEADERS];
 }
 
 /** Required NetBox device columns the profile leaves empty (NetBox rejects the device import without them). */
@@ -373,7 +377,7 @@ export function buildDeviceImportRows(devices, profile) {
       site: profile.netbox_site || '',
       status: profile.device_status || 'active',
     };
-    if (profile.netbox_location) row.location = profile.netbox_location;
+    if (profile.netbox_location || profile.location_column) row.location = d.location || profile.netbox_location || '';
     return row;
   });
 }

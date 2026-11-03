@@ -23,6 +23,7 @@ export function createEmptyProfile(name = 'New profile') {
     netbox_manufacturer: '',
     netbox_site: '',
     netbox_location: '',
+    location_column: '',
     device_status: 'active',
     default_split_strategy: 'largest_first',
     is_default: false,
@@ -51,6 +52,7 @@ export function createSeedProfile() {
   const p = createEmptyProfile('NetBox Standard (12-Bay)');
   p.id = 'default-12bay';
   p.is_default = true;
+  p.location_column = 'Raum';
   p.blocks = [{
     id: generateId(),
     count_column: 'Anzahl Bodentanks',
@@ -85,7 +87,7 @@ export const LAN_LAYOUTS = ['2', '3', 'custom'];
 export function normalizeProfile(p) {
   if (p.lan_layout === undefined) p.lan_layout = (p.splitRules || []).length > 0 ? 'custom' : '2';
   if (p.lan_fill_name === undefined) p.lan_fill_name = 'unknown';
-  for (const k of ['netbox_role', 'netbox_manufacturer', 'netbox_site', 'netbox_location']) if (p[k] === undefined) p[k] = '';
+  for (const k of ['netbox_role', 'netbox_manufacturer', 'netbox_site', 'netbox_location', 'location_column']) if (p[k] === undefined) p[k] = '';
   if (p.device_status === undefined) p.device_status = 'active';
   return p;
 }

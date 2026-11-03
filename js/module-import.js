@@ -178,6 +178,8 @@ function renderGeneral(d) {
       <div class="form-group"><label>${esc(t('mi_ed_location'))}</label>
         <input type="text" data-k="netbox_location" value="${esc(d.netbox_location)}" autocomplete="off"></div>
     </div>
+    <div class="form-group"><label>${esc(t('mi_ed_location_col'))}</label>
+      <input type="text" data-k="location_column" list="mi-dl-headers" value="${esc(d.location_column)}" autocomplete="off"></div>
     <div class="form-group"><label>${esc(t('mi_ed_dev_status'))}</label>
       ${selectHtml(['active', 'planned', 'staged', 'offline', 'inventory', 'decommissioning'], d.device_status, 'data-k="device_status"')}</div>
     <p class="settings-section-desc">${esc(t('mi_ed_device_fields_hint'))}</p>

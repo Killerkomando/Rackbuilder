@@ -415,7 +415,7 @@ test('imported profile with malformed structure is rejected', () => {
 });
 
 test('device-import.csv carries the device fields NetBox requires, one row per device', () => {
-  const p = { ...profile, netbox_device_type_id: 'Bodentank 12-Bay', netbox_manufacturer: 'Acme', netbox_role: 'Bodentank', netbox_site: 'Werk 1', device_status: 'planned' };
+  const p = { ...profile, location_column: '', netbox_device_type_id: 'Bodentank 12-Bay', netbox_manufacturer: 'Acme', netbox_role: 'Bodentank', netbox_site: 'Werk 1', device_status: 'planned' };
   assert.deepEqual(missingDeviceFields(profile), ['role', 'manufacturer', 'device_type', 'site']);
   assert.deepEqual(missingDeviceFields(p), []);
   const rows = buildDeviceImportRows([dev('Raum 1, EG Bodentank B')], p);
@@ -423,7 +423,7 @@ test('device-import.csv carries the device fields NetBox requires, one row per d
   assert.equal(writeCsv(rows, deviceImportHeaders(p)).split('\n')[0], 'name,role,manufacturer,device_type,site,status');
   const withLoc = { ...p, netbox_location: 'EG' };
   assert.equal(deviceImportHeaders(withLoc).at(-1), 'location');
-  assert.equal(buildDeviceImportRows([dev('Raum 1, EG Bodentank B')], withLoc)[0].location, 'EG');
+  assert.equal(buildDeviceImportRows([{ ...dev('Raum 1, EG Bodentank B'), location: '' }], withLoc)[0].location, 'EG');
 });
 
 test('profiles without device fields are normalized with defaults', () => {
@@ -431,4 +431,25 @@ test('profiles without device fields are normalized with defaults', () => {
   assert.equal(n.netbox_role, '');
   assert.equal(n.netbox_manufacturer, '');
   assert.equal(n.device_status, 'active');
+});
+
+test('location column writes each room as the device location, with the fixed location as fallback', () => {
+  const p = { ...profile, location_column: 'Raum', netbox_location: 'Lager', netbox_device_type_id: 'T', netbox_manufacturer: 'M', netbox_role: 'R', netbox_site: 'S' };
+  const rows = [
+    { Raum: 'Raum 7', 'Anzahl Bodentanks': '1', 'Bodentank A Steckdosen weiß': '2' },
+    { Raum: '', 'Anzahl Bodentanks': '1', 'Bodentank A Steckdosen weiß': '2' },
+  ];
+  const headers = ['Raum', 'Anzahl Bodentanks', 'Bodentank A Steckdosen weiß'];
+  const r = analyzeCsv({ headers, rows }, p);
+  assert.deepEqual(r.devices.map(d => d.location), ['Raum 7', '']);
+  const out = buildDeviceImportRows(r.devices, p);
+  assert.deepEqual(out.map(x => x.location), ['Raum 7', 'Lager']);
+  assert.equal(deviceImportHeaders(p).at(-1), 'location');
+  assert.equal(deviceImportHeaders({ ...p, location_column: '', netbox_location: '' }).includes('location'), false);
+});
+
+test('configured location column that is absent from the file is a file error', () => {
+  const p = { ...profile, location_column: 'Gebäude' };
+  const r = analyzeCsv({ headers: warnHeaders, rows: [warnRow('1', '', '', ['A', 'B'])] }, p);
+  assert.ok(r.errors.some(e => e.code === 'column_missing' && e.params.column === 'Gebäude'));
 });
