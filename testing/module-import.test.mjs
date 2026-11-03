@@ -12,7 +12,7 @@ import {
 } from '../js/import-engine.js';
 import {
   createSeedProfile, validateProfile, duplicateProfile, exportProfileJson, importProfileJson,
-  loadProfiles, saveProfiles, PROFILES_KEY, expandSequence, normalizeProfile,
+  loadProfiles, saveProfiles, PROFILES_KEY, expandSequence, normalizeProfile, NAME_MODIFIERS, parsePlaceholder,
 } from '../js/import-profiles.js';
 
 const dir = dirname(fileURLToPath(import.meta.url));
@@ -495,4 +495,30 @@ test('name pattern validation: unknown placeholder and missing site abbreviation
   assert.ok(codes({ ...profile, device_name_pattern: '{site_abbr}-{block}', site_abbr: '' }).includes('device_name_part_missing'));
   assert.ok(!codes({ ...profile, device_name_pattern: '{site_abbr}-{col:Raum}-BT{block}', site_abbr: 'WK1' }).some(c => c.startsWith('device_name')));
   assert.ok(codes({ ...profile, device_name_pattern: '{col:}' }).includes('device_name_pattern_invalid'));
+});
+
+test('name modifiers change case and format', () => {
+  assert.equal(NAME_MODIFIERS.upper('Raum a'), 'RAUM A');
+  assert.equal(NAME_MODIFIERS.lower('Raum A'), 'raum a');
+  assert.equal(NAME_MODIFIERS.title('raum 1, eg-süd'), 'Raum 1, Eg-Süd');
+  assert.equal(NAME_MODIFIERS.nospace('Raum 1,  EG'), 'Raum1,EG');
+  assert.equal(NAME_MODIFIERS.slug('Raum 1, EG Süd!'), 'raum-1-eg-sud');
+  assert.equal(NAME_MODIFIERS.digits('Raum 12, EG'), '12');
+  assert.deepEqual(parsePlaceholder('col:Raum | nospace |lower'), { base: 'col:Raum', mods: ['nospace', 'lower'] });
+});
+
+test('device name pattern applies modifiers to columns and block, chained in order', () => {
+  const p = { ...profile, device_name_pattern: 'cool-{col:Raum|lower}-bt{block|upper}-{col:Raum|digits}-{site_abbr|upper}', site_abbr: 'wk1' };
+  const rows = [{ Raum: 'Raum 101', 'Anzahl Bodentanks': '2', 'Bodentank A Steckdosen weiß': '2' }];
+  const r = analyzeCsv({ headers: nameHeaders, rows }, p);
+  assert.deepEqual(r.devices.map(d => d.name), ['cool-raum 101-btA-101-WK1', 'cool-raum 101-btB-101-WK1']);
+  const q = { ...p, device_name_pattern: '{col:Raum|nospace|lower}-{block|lower}' };
+  assert.equal(analyzeCsv({ headers: nameHeaders, rows }, q).devices[0].name, 'raum101-a');
+});
+
+test('unknown modifier is a validation error; modifiers do not hide a missing site abbreviation', () => {
+  const codes = p => validateProfile(p).errors.map(e => e.code);
+  assert.ok(codes({ ...profile, device_name_pattern: '{block|shout}' }).includes('device_name_modifier_invalid'));
+  assert.ok(codes({ ...profile, device_name_pattern: '{site_abbr|upper}-{block}', site_abbr: '' }).includes('device_name_part_missing'));
+  assert.ok(!codes({ ...profile, device_name_pattern: '{col:Raum|lower}-{block|upper}' }).some(c => c.startsWith('device_name')));
 });

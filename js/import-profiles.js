@@ -108,6 +108,22 @@ export function moduleSizeFor(profile, moduleName) {
 }
 
 /** Fill `{prefix}`, `{block}`, `{n}` placeholders. */
+/** Modifiers usable in device name patterns, e.g. `{col:Raum|lower}` or `{block|upper}`; chain with more `|`. */
+export const NAME_MODIFIERS = {
+  upper: s => s.toUpperCase(),
+  lower: s => s.toLowerCase(),
+  title: s => s.toLowerCase().replace(/(^|[\s\-_])(\p{L})/gu, (m, sep, ch) => sep + ch.toUpperCase()),
+  nospace: s => s.replace(/\s+/g, ''),
+  slug: s => s.replace(/ß/g, 'ss').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
+  digits: s => s.replace(/\D+/g, ''),
+};
+
+/** Split the inside of a placeholder: "col:Raum|nospace|lower" → { base: 'col:Raum', mods: ['nospace','lower'] }. */
+export function parsePlaceholder(key) {
+  const [base, ...mods] = String(key).split('|').map(x => x.trim());
+  return { base, mods };
+}
+
 export function fillPattern(pattern, vars) {
   return String(pattern ?? '').replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
 }
@@ -170,11 +186,13 @@ export function validateProfile(profile, knownModuleTypes = []) {
   const namePattern = String(profile.device_name_pattern || '').trim();
   if (namePattern) {
     const allowed = new Set(['site', 'site_abbr', 'row', 'block', 'prefix']);
-    const bad = [...namePattern.matchAll(/\{([^}]*)\}/g)].map(m => m[1])
-      .filter(k => !allowed.has(k) && !(k.startsWith('col:') && k.slice(4).trim()));
-    if (bad.length) err('device_name_pattern_invalid', { placeholder: `{${bad[0]}}` });
-    if (namePattern.includes('{site_abbr}') && !String(profile.site_abbr ?? '').trim()) err('device_name_part_missing', { field: 'site_abbr' });
-    if (namePattern.includes('{site}') && !String(profile.netbox_site ?? '').trim()) err('device_name_part_missing', { field: 'site' });
+    const parsed = [...namePattern.matchAll(/\{([^}]*)\}/g)].map(m => ({ raw: m[1], ...parsePlaceholder(m[1]) }));
+    const bad = parsed.filter(p => !allowed.has(p.base) && !(p.base.startsWith('col:') && p.base.slice(4).trim()));
+    if (bad.length) err('device_name_pattern_invalid', { placeholder: `{${bad[0].raw}}` });
+    const badMod = parsed.flatMap(p => p.mods).find(m => !Object.hasOwn(NAME_MODIFIERS, m));
+    if (badMod !== undefined) err('device_name_modifier_invalid', { modifier: badMod });
+    if (parsed.some(p => p.base === 'site_abbr') && !String(profile.site_abbr ?? '').trim()) err('device_name_part_missing', { field: 'site_abbr' });
+    if (parsed.some(p => p.base === 'site') && !String(profile.netbox_site ?? '').trim()) err('device_name_part_missing', { field: 'site' });
   }
 
   const known = new Set(knownModuleTypes);

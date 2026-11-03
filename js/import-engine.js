@@ -1,7 +1,7 @@
 // NetBox module import engine: CSV table + profile → devices with module-bay assignments.
 // Pure logic (no DOM, no storage) so it can be tested in Node.
 
-import { moduleSizeFor, fillPattern } from './import-profiles.js';
+import { moduleSizeFor, fillPattern, NAME_MODIFIERS, parsePlaceholder } from './import-profiles.js';
 
 export const MODULE_IMPORT_HEADERS = ['device', 'module_bay', 'module_type', 'status', 'replicate_components'];
 export const DEVICE_IMPORT_BASE_HEADERS = ['name', 'role', 'manufacturer', 'device_type', 'site', 'status'];
@@ -164,16 +164,23 @@ export function analyzeCsv(table, profile) {
   const namePattern = String(profile.device_name_pattern || '').trim();
   const nameColHeaders = new Map();
   for (const m of namePattern.matchAll(/\{col:([^}]+)\}/g)) {
-    const ref = m[1].trim();
+    const ref = parsePlaceholder(m[1]).base;
     const header = findHeader(ref);
     if (header) nameColHeaders.set(ref, header); else reportFile('column_missing', { column: ref });
   }
-  const expandName = (vars, row) => namePattern.replace(/\{([^}]+)\}/g, (m, k) => {
-    if (k.startsWith('col:')) {
-      const header = nameColHeaders.get(k.slice(4).trim());
-      return header ? String(row[header] ?? '').trim() : '';
+  const expandName = (vars, row) => namePattern.replace(/\{([^}]+)\}/g, (m, key) => {
+    const { base, mods } = parsePlaceholder(key);
+    let value;
+    if (base.startsWith('col:')) {
+      const header = nameColHeaders.get(base.slice(4).trim());
+      value = header ? String(row[header] ?? '').trim() : '';
+    } else if (Object.hasOwn(vars, base)) {
+      value = String(vars[base]);
+    } else {
+      return m;
     }
-    return k in vars ? String(vars[k]) : m;
+    for (const mod of mods) if (Object.hasOwn(NAME_MODIFIERS, mod)) value = NAME_MODIFIERS[mod](value);
+    return value;
   });
 
   for (const block of profile.blocks || []) {
