@@ -494,7 +494,7 @@ export async function apiFetchPages(baseUrl, token, endpoint, query = '') {
     const res = await fetch(url, {
       headers: { 'Authorization': netboxAuthHeader(token), 'Accept': 'application/json' },
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} (${url})`);
     const data = await res.json();
     results.push(...(data.results || []));
     url = data.next || null;
@@ -649,7 +649,7 @@ export async function initNetboxAutocomplete() {
       const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/api/`, {
         headers: { 'Authorization': netboxAuthHeader(token), 'Accept': 'application/json' },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status} (${res.url || baseUrl})`);
       if (status) { status.textContent = t('netbox_api_connected'); status.className = 'netbox-api-conn-status success'; }
     } catch (err) {
       const msg = (err instanceof TypeError)

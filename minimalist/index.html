@@ -7596,7 +7596,7 @@ async function apiFetchPages(baseUrl, token, endpoint, query = '') {
   let url = `${baseUrl.replace(/\/+$/, '')}/api/${endpoint}/?limit=200&format=json${query ? '&' + query : ''}`;
   while (url) {
     const res = await fetch(url, { headers: { 'Authorization': netboxAuthHeader(token), 'Accept': 'application/json' } });
-    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} (${url})`);
     const data = await res.json();
     results.push(...(data.results || []));
     url = data.next || null;
@@ -7712,7 +7712,7 @@ function initNetboxAutocomplete() {
     if (btn) btn.disabled = true;
     try {
       const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/api/`, { headers: { 'Authorization': netboxAuthHeader(token), 'Accept': 'application/json' } });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status} (${res.url || baseUrl})`);
       if (status) { status.textContent = t('netbox_api_connected'); status.className = 'netbox-api-conn-status success'; }
     } catch (err) {
       const msg = (err instanceof TypeError) ? t('netbox_api_cors_error') : `${t('netbox_api_error')}: ${err.message}`;
@@ -10093,7 +10093,7 @@ const APP_VERSION = '0.9.0';
 const APP_CODENAME = 'Patchkabel';
 
 // Name of the service-worker cache that ships with this version (must equal CACHE_NAME in sw.js).
-const EXPECTED_CACHE = 'rackbuilder-v14';
+const EXPECTED_CACHE = 'rackbuilder-v15';
 const CACHE_PREFIX = 'rackbuilder-v';
 
 /**
