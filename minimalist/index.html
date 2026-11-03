@@ -3972,6 +3972,13 @@ const translations = {
     mi_ed_slots: 'Module bays',
     mi_ed_role: 'Device role',
     mi_ed_manufacturer: 'Manufacturer',
+    mi_ed_name_pattern: 'Device name pattern (empty = row name + prefix)',
+    mi_ed_site_abbr: 'Site abbreviation (for {site_abbr})',
+    mi_ed_name_pattern_hint: 'Placeholders: {site_abbr}, {site}, {block} (block letter), {row} (value of the row name column), {prefix} (prefix pattern) and {col:Column name} for any CSV column. Other text is kept as typed. Example: {site_abbr}-{col:Raum}-BT{block}. Device names must be unique.',
+    mi_val_device_name_pattern_invalid: 'Device name pattern: unknown placeholder {placeholder}.',
+    mi_val_device_name_part_missing: 'Device name pattern uses "{field}", but the profile has no value for it.',
+    mi_err_device_name_duplicate: 'Device name "{name}" is already used (row {row}). NetBox needs unique names.',
+    mi_err_device_name_empty: 'The device name pattern produces an empty name.',
     mi_ed_site: 'Site',
     mi_ed_location: 'Location (fixed, fallback)',
     mi_ed_location_col: 'Location column (CSV column per device, e.g. room)',
@@ -4395,6 +4402,13 @@ const translations = {
     mi_ed_slots: 'Modul-Bays',
     mi_ed_role: 'Geräterolle',
     mi_ed_manufacturer: 'Hersteller',
+    mi_ed_name_pattern: 'Gerätenamen-Muster (leer = Zeilenname + Präfix)',
+    mi_ed_site_abbr: 'Standort-Kürzel (für {site_abbr})',
+    mi_ed_name_pattern_hint: 'Platzhalter: {site_abbr}, {site}, {block} (Block-Buchstabe), {row} (Wert der Zeilennamen-Spalte), {prefix} (Präfix-Muster) und {col:Spaltenname} für jede CSV-Spalte. Anderer Text bleibt wie eingegeben. Beispiel: {site_abbr}-{col:Raum}-BT{block}. Gerätenamen müssen eindeutig sein.',
+    mi_val_device_name_pattern_invalid: 'Gerätenamen-Muster: unbekannter Platzhalter {placeholder}.',
+    mi_val_device_name_part_missing: 'Das Gerätenamen-Muster nutzt „{field}", im Profil ist dafür aber kein Wert gesetzt.',
+    mi_err_device_name_duplicate: 'Gerätename „{name}" wird schon verwendet (Zeile {row}). NetBox braucht eindeutige Namen.',
+    mi_err_device_name_empty: 'Das Gerätenamen-Muster ergibt einen leeren Namen.',
     mi_ed_site: 'Standort (Site)',
     mi_ed_location: 'Location (fest, Rückfall)',
     mi_ed_location_col: 'Location-Spalte (CSV-Spalte pro Gerät, z. B. Raum)',
@@ -7951,6 +7965,8 @@ function createEmptyProfile(name = 'New profile') {
     netbox_site: '',
     netbox_location: '',
     location_column: '',
+    device_name_pattern: '',
+    site_abbr: '',
     device_status: 'active',
     default_split_strategy: 'largest_first',
     is_default: false,
@@ -8014,7 +8030,7 @@ const LAN_LAYOUTS = ['2', '3', 'custom'];
 function normalizeProfile(p) {
   if (p.lan_layout === undefined) p.lan_layout = (p.splitRules || []).length > 0 ? 'custom' : '2';
   if (p.lan_fill_name === undefined) p.lan_fill_name = 'unknown';
-  for (const k of ['netbox_role', 'netbox_manufacturer', 'netbox_site', 'netbox_location', 'location_column']) if (p[k] === undefined) p[k] = '';
+  for (const k of ['netbox_role', 'netbox_manufacturer', 'netbox_site', 'netbox_location', 'location_column', 'device_name_pattern', 'site_abbr']) if (p[k] === undefined) p[k] = '';
   if (p.device_status === undefined) p.device_status = 'active';
   return p;
 }
@@ -8090,6 +8106,16 @@ function validateProfile(profile, knownModuleTypes = []) {
         !c.some(x => x.field === 'category' && x.op === 'eq' && String(x.value).toLowerCase() !== 'lan');
     });
     if (!hasLanRule) warn('lan_layout_no_rule', { size });
+  }
+
+  const namePattern = String(profile.device_name_pattern || '').trim();
+  if (namePattern) {
+    const allowed = new Set(['site', 'site_abbr', 'row', 'block', 'prefix']);
+    const bad = [...namePattern.matchAll(/\{([^}]*)\}/g)].map(m => m[1])
+      .filter(k => !allowed.has(k) && !(k.startsWith('col:') && k.slice(4).trim()));
+    if (bad.length) err('device_name_pattern_invalid', { placeholder: `{${bad[0]}}` });
+    if (namePattern.includes('{site_abbr}') && !String(profile.site_abbr ?? '').trim()) err('device_name_part_missing', { field: 'site_abbr' });
+    if (namePattern.includes('{site}') && !String(profile.netbox_site ?? '').trim()) err('device_name_part_missing', { field: 'site' });
   }
 
   const known = new Set(knownModuleTypes);
@@ -8364,6 +8390,22 @@ function analyzeCsv(table, profile) {
   const locationHeader = profile.location_column ? findHeader(profile.location_column) : null;
   if (profile.location_column && !locationHeader) reportFile('column_missing', { column: profile.location_column });
 
+  // Optional device name pattern, e.g. "{site_abbr}-{col:Raum}-BT{block}". Empty = "<row name> <prefix>".
+  const namePattern = String(profile.device_name_pattern || '').trim();
+  const nameColHeaders = new Map();
+  for (const m of namePattern.matchAll(/\{col:([^}]+)\}/g)) {
+    const ref = m[1].trim();
+    const header = findHeader(ref);
+    if (header) nameColHeaders.set(ref, header); else reportFile('column_missing', { column: ref });
+  }
+  const expandName = (vars, row) => namePattern.replace(/\{([^}]+)\}/g, (m, k) => {
+    if (k.startsWith('col:')) {
+      const header = nameColHeaders.get(k.slice(4).trim());
+      return header ? String(row[header] ?? '').trim() : '';
+    }
+    return k in vars ? String(vars[k]) : m;
+  });
+
   for (const block of profile.blocks || []) {
     const countHeader = findHeader(block.count_column);
     if (!countHeader) { reportFile('column_missing', { column: block.count_column }); continue; }
@@ -8387,7 +8429,9 @@ function analyzeCsv(table, profile) {
 
       for (const blockId of seq.slice(0, n)) {
         const prefix = fillPattern(block.prefix_pattern, { block: blockId });
-        const name = [rowName, prefix].filter(Boolean).join(' ');
+        const name = namePattern
+          ? expandName({ site: profile.netbox_site || '', site_abbr: profile.site_abbr || '', row: rowName, block: blockId, prefix }, row).trim()
+          : [rowName, prefix].filter(Boolean).join(' ');
         const location = locationHeader ? (row[locationHeader] || '').trim() : '';
         const device = { name, location, rowIndex, block: blockId, bays: new Array(slots).fill(null), issues: [], warnings: [] };
         const fail = (code, params, bay = null) => {
@@ -8495,6 +8539,18 @@ function analyzeCsv(table, profile) {
         devices.push(device);
       }
     });
+  }
+
+  // NetBox rejects empty device names and duplicate names within a site.
+  const seenNames = new Map();
+  for (const d of devices) {
+    const first = seenNames.get(d.name);
+    if (first === undefined) seenNames.set(d.name, d.rowIndex);
+    const code = !d.name ? 'device_name_empty' : first !== undefined ? 'device_name_duplicate' : null;
+    if (!code) continue;
+    const issue = { rowIndex: d.rowIndex, device: d.name, bay: null, code, params: { name: d.name, row: first ?? d.rowIndex } };
+    errors.push(issue);
+    d.issues.push(issue);
   }
 
   return {
@@ -8818,6 +8874,11 @@ function renderGeneral(d) {
     <div class="form-group"><label>${esc(t('mi_ed_dev_status'))}</label>
       ${selectHtml(['active', 'planned', 'staged', 'offline', 'inventory', 'decommissioning'], d.device_status, 'data-k="device_status"')}</div>
     <p class="settings-section-desc">${esc(t('mi_ed_device_fields_hint'))}</p>
+    <div class="form-group"><label>${esc(t('mi_ed_name_pattern'))}</label>
+      <input type="text" data-k="device_name_pattern" value="${esc(d.device_name_pattern)}" placeholder="{site_abbr}-{col:Raum}-BT{block}" autocomplete="off"></div>
+    <div class="form-group"><label>${esc(t('mi_ed_site_abbr'))}</label>
+      <input type="text" data-k="site_abbr" value="${esc(d.site_abbr)}" autocomplete="off"></div>
+    <p class="settings-section-desc">${esc(t('mi_ed_name_pattern_hint'))}</p>
     <div class="form-group"><label>${esc(t('mi_ed_strategy'))}</label>
       ${selectHtml(SPLIT_STRATEGIES, d.default_split_strategy, 'data-k="default_split_strategy"', s => t('mi_strategy_' + s))}</div>
     <div class="form-row">
@@ -9994,7 +10055,7 @@ const APP_VERSION = '0.9.0';
 const APP_CODENAME = 'Patchkabel';
 
 // Name of the service-worker cache that ships with this version (must equal CACHE_NAME in sw.js).
-const EXPECTED_CACHE = 'rackbuilder-v11';
+const EXPECTED_CACHE = 'rackbuilder-v12';
 const CACHE_PREFIX = 'rackbuilder-v';
 
 /**

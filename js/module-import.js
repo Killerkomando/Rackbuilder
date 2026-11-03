@@ -183,6 +183,11 @@ function renderGeneral(d) {
     <div class="form-group"><label>${esc(t('mi_ed_dev_status'))}</label>
       ${selectHtml(['active', 'planned', 'staged', 'offline', 'inventory', 'decommissioning'], d.device_status, 'data-k="device_status"')}</div>
     <p class="settings-section-desc">${esc(t('mi_ed_device_fields_hint'))}</p>
+    <div class="form-group"><label>${esc(t('mi_ed_name_pattern'))}</label>
+      <input type="text" data-k="device_name_pattern" value="${esc(d.device_name_pattern)}" placeholder="{site_abbr}-{col:Raum}-BT{block}" autocomplete="off"></div>
+    <div class="form-group"><label>${esc(t('mi_ed_site_abbr'))}</label>
+      <input type="text" data-k="site_abbr" value="${esc(d.site_abbr)}" autocomplete="off"></div>
+    <p class="settings-section-desc">${esc(t('mi_ed_name_pattern_hint'))}</p>
     <div class="form-group"><label>${esc(t('mi_ed_strategy'))}</label>
       ${selectHtml(SPLIT_STRATEGIES, d.default_split_strategy, 'data-k="default_split_strategy"', s => t('mi_strategy_' + s))}</div>
     <div class="form-row">

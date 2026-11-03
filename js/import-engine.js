@@ -160,6 +160,22 @@ export function analyzeCsv(table, profile) {
   const locationHeader = profile.location_column ? findHeader(profile.location_column) : null;
   if (profile.location_column && !locationHeader) reportFile('column_missing', { column: profile.location_column });
 
+  // Optional device name pattern, e.g. "{site_abbr}-{col:Raum}-BT{block}". Empty = "<row name> <prefix>".
+  const namePattern = String(profile.device_name_pattern || '').trim();
+  const nameColHeaders = new Map();
+  for (const m of namePattern.matchAll(/\{col:([^}]+)\}/g)) {
+    const ref = m[1].trim();
+    const header = findHeader(ref);
+    if (header) nameColHeaders.set(ref, header); else reportFile('column_missing', { column: ref });
+  }
+  const expandName = (vars, row) => namePattern.replace(/\{([^}]+)\}/g, (m, k) => {
+    if (k.startsWith('col:')) {
+      const header = nameColHeaders.get(k.slice(4).trim());
+      return header ? String(row[header] ?? '').trim() : '';
+    }
+    return k in vars ? String(vars[k]) : m;
+  });
+
   for (const block of profile.blocks || []) {
     const countHeader = findHeader(block.count_column);
     if (!countHeader) { reportFile('column_missing', { column: block.count_column }); continue; }
@@ -183,7 +199,9 @@ export function analyzeCsv(table, profile) {
 
       for (const blockId of seq.slice(0, n)) {
         const prefix = fillPattern(block.prefix_pattern, { block: blockId });
-        const name = [rowName, prefix].filter(Boolean).join(' ');
+        const name = namePattern
+          ? expandName({ site: profile.netbox_site || '', site_abbr: profile.site_abbr || '', row: rowName, block: blockId, prefix }, row).trim()
+          : [rowName, prefix].filter(Boolean).join(' ');
         const location = locationHeader ? (row[locationHeader] || '').trim() : '';
         const device = { name, location, rowIndex, block: blockId, bays: new Array(slots).fill(null), issues: [], warnings: [] };
         const fail = (code, params, bay = null) => {
@@ -291,6 +309,18 @@ export function analyzeCsv(table, profile) {
         devices.push(device);
       }
     });
+  }
+
+  // NetBox rejects empty device names and duplicate names within a site.
+  const seenNames = new Map();
+  for (const d of devices) {
+    const first = seenNames.get(d.name);
+    if (first === undefined) seenNames.set(d.name, d.rowIndex);
+    const code = !d.name ? 'device_name_empty' : first !== undefined ? 'device_name_duplicate' : null;
+    if (!code) continue;
+    const issue = { rowIndex: d.rowIndex, device: d.name, bay: null, code, params: { name: d.name, row: first ?? d.rowIndex } };
+    errors.push(issue);
+    d.issues.push(issue);
   }
 
   return {

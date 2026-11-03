@@ -24,6 +24,8 @@ export function createEmptyProfile(name = 'New profile') {
     netbox_site: '',
     netbox_location: '',
     location_column: '',
+    device_name_pattern: '',
+    site_abbr: '',
     device_status: 'active',
     default_split_strategy: 'largest_first',
     is_default: false,
@@ -87,7 +89,7 @@ export const LAN_LAYOUTS = ['2', '3', 'custom'];
 export function normalizeProfile(p) {
   if (p.lan_layout === undefined) p.lan_layout = (p.splitRules || []).length > 0 ? 'custom' : '2';
   if (p.lan_fill_name === undefined) p.lan_fill_name = 'unknown';
-  for (const k of ['netbox_role', 'netbox_manufacturer', 'netbox_site', 'netbox_location', 'location_column']) if (p[k] === undefined) p[k] = '';
+  for (const k of ['netbox_role', 'netbox_manufacturer', 'netbox_site', 'netbox_location', 'location_column', 'device_name_pattern', 'site_abbr']) if (p[k] === undefined) p[k] = '';
   if (p.device_status === undefined) p.device_status = 'active';
   return p;
 }
@@ -163,6 +165,16 @@ export function validateProfile(profile, knownModuleTypes = []) {
         !c.some(x => x.field === 'category' && x.op === 'eq' && String(x.value).toLowerCase() !== 'lan');
     });
     if (!hasLanRule) warn('lan_layout_no_rule', { size });
+  }
+
+  const namePattern = String(profile.device_name_pattern || '').trim();
+  if (namePattern) {
+    const allowed = new Set(['site', 'site_abbr', 'row', 'block', 'prefix']);
+    const bad = [...namePattern.matchAll(/\{([^}]*)\}/g)].map(m => m[1])
+      .filter(k => !allowed.has(k) && !(k.startsWith('col:') && k.slice(4).trim()));
+    if (bad.length) err('device_name_pattern_invalid', { placeholder: `{${bad[0]}}` });
+    if (namePattern.includes('{site_abbr}') && !String(profile.site_abbr ?? '').trim()) err('device_name_part_missing', { field: 'site_abbr' });
+    if (namePattern.includes('{site}') && !String(profile.netbox_site ?? '').trim()) err('device_name_part_missing', { field: 'site' });
   }
 
   const known = new Set(knownModuleTypes);

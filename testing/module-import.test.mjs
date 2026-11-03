@@ -453,3 +453,46 @@ test('configured location column that is absent from the file is a file error', 
   const r = analyzeCsv({ headers: warnHeaders, rows: [warnRow('1', '', '', ['A', 'B'])] }, p);
   assert.ok(r.errors.some(e => e.code === 'column_missing' && e.params.column === 'Gebäude'));
 });
+
+// ── device name pattern ──
+const nameHeaders = ['Raum', 'Anzahl Bodentanks', 'Bodentank A Steckdosen weiß'];
+const nameRows = [
+  { Raum: 'R101', 'Anzahl Bodentanks': '2', 'Bodentank A Steckdosen weiß': '2' },
+  { Raum: 'R102', 'Anzahl Bodentanks': '1', 'Bodentank A Steckdosen weiß': '2' },
+];
+
+test('device name pattern builds names from site abbreviation, CSV column and block', () => {
+  const p = { ...profile, device_name_pattern: '{site_abbr}-{col:Raum}-BT{block}', site_abbr: 'WK1' };
+  const r = analyzeCsv({ headers: nameHeaders, rows: nameRows }, p);
+  assert.deepEqual(r.devices.map(d => d.name), ['WK1-R101-BTA', 'WK1-R101-BTB', 'WK1-R102-BTA']);
+  assert.equal(r.errors.filter(e => e.code.startsWith('device_name')).length, 0);
+});
+
+test('without a pattern the name stays row name + prefix', () => {
+  const r = analyzeCsv({ headers: nameHeaders, rows: nameRows }, profile);
+  assert.deepEqual(r.devices.map(d => d.name), ['R101 Bodentank A', 'R101 Bodentank B', 'R102 Bodentank A']);
+});
+
+test('duplicate device names are errors on the later device', () => {
+  const p = { ...profile, device_name_pattern: '{col:Raum}' };
+  const r = analyzeCsv({ headers: nameHeaders, rows: nameRows }, p);
+  const dups = r.errors.filter(e => e.code === 'device_name_duplicate');
+  assert.equal(dups.length, 1);
+  assert.equal(dups[0].params.name, 'R101');
+  assert.equal(r.devices[1].issues.some(i => i.code === 'device_name_duplicate'), true);
+});
+
+test('empty name and missing {col:} column are reported', () => {
+  const empty = analyzeCsv({ headers: nameHeaders, rows: nameRows }, { ...profile, device_name_pattern: '{site_abbr}', site_abbr: '' });
+  assert.ok(empty.errors.some(e => e.code === 'device_name_empty'));
+  const missing = analyzeCsv({ headers: nameHeaders, rows: nameRows }, { ...profile, device_name_pattern: '{col:Gebäude}-{block}' });
+  assert.ok(missing.errors.some(e => e.code === 'column_missing' && e.params.column === 'Gebäude'));
+});
+
+test('name pattern validation: unknown placeholder and missing site abbreviation', () => {
+  const codes = p => validateProfile(p).errors.map(e => e.code);
+  assert.ok(codes({ ...profile, device_name_pattern: '{nope}-{block}' }).includes('device_name_pattern_invalid'));
+  assert.ok(codes({ ...profile, device_name_pattern: '{site_abbr}-{block}', site_abbr: '' }).includes('device_name_part_missing'));
+  assert.ok(!codes({ ...profile, device_name_pattern: '{site_abbr}-{col:Raum}-BT{block}', site_abbr: 'WK1' }).some(c => c.startsWith('device_name')));
+  assert.ok(codes({ ...profile, device_name_pattern: '{col:}' }).includes('device_name_pattern_invalid'));
+});
