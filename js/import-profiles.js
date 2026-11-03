@@ -32,6 +32,9 @@ export function createEmptyProfile(name = 'New profile') {
     slot_count: 12,
     bay_name_pattern: '{n}',
     interface_name_template: 'Gi{module}/0/{n}',
+    port_kind: 'front_rear',
+    front_port_name_template: 'Gi{module}/0/{n}',
+    rear_port_name_template: 'Gi{module}/0/{n}',
     lan_layout: '2',
     lan_fill_name: 'unknown',
     created_at: new Date().toISOString(),
@@ -82,6 +85,23 @@ export function createSeedProfile() {
 
 export const LAN_LAYOUTS = ['2', '3', 'custom'];
 
+export const DEFAULT_PORT_TEMPLATE = 'Gi{module}/0/{n}';
+
+/** NetBox objects the LAN ports of a module can be: API endpoint, the profile field with the expected-name template, export file name. */
+export const PORT_KINDS = {
+  interface:  { endpoint: 'dcim/interfaces',  template: 'interface_name_template',  file: 'interface-rename.csv' },
+  front_port: { endpoint: 'dcim/front-ports', template: 'front_port_name_template', file: 'front-port-rename.csv' },
+  rear_port:  { endpoint: 'dcim/rear-ports',  template: 'rear_port_name_template',  file: 'rear-port-rename.csv' },
+};
+
+/** Profile choice `port_kind` → the kinds that get a rename file. */
+export const PORT_KIND_SETS = {
+  front_rear: ['front_port', 'rear_port'],
+  front_port: ['front_port'],
+  rear_port: ['rear_port'],
+  interface: ['interface'],
+};
+
 /**
  * Fill in fields added after a profile was saved. Profiles without the LAN layout option keep
  * working as before when they define explicit port splits ("custom"), otherwise they get the default.
@@ -91,6 +111,8 @@ export function normalizeProfile(p) {
   if (p.lan_fill_name === undefined) p.lan_fill_name = 'unknown';
   for (const k of ['netbox_role', 'netbox_manufacturer', 'netbox_site', 'netbox_location', 'location_column', 'device_name_pattern', 'site_abbr']) if (p[k] === undefined) p[k] = '';
   if (p.device_status === undefined) p.device_status = 'active';
+  if (p.port_kind === undefined) p.port_kind = 'front_rear';
+  for (const k of ['front_port_name_template', 'rear_port_name_template']) if (p[k] === undefined) p[k] = p.interface_name_template || DEFAULT_PORT_TEMPLATE;
   return p;
 }
 
@@ -171,6 +193,7 @@ export function validateProfile(profile, knownModuleTypes = []) {
   const slots = Number(profile.slot_count);
   if (!Number.isInteger(slots) || slots < 1 || slots > 99) err('slot_count_invalid');
   if (!SPLIT_STRATEGIES.includes(profile.default_split_strategy)) err('strategy_invalid');
+  if (!Object.hasOwn(PORT_KIND_SETS, profile.port_kind)) err('port_kind_invalid');
   if (!LAN_LAYOUTS.includes(profile.lan_layout)) err('lan_layout_invalid');
   else if (profile.lan_layout !== 'custom') {
     if (!String(profile.lan_fill_name ?? '').trim()) err('lan_fill_required');

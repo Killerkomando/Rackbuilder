@@ -7,7 +7,7 @@ import { createZip } from './zip.js';
 import {
   loadProfiles, saveProfiles, createEmptyProfile, createSeedProfile, duplicateProfile,
   exportProfileJson, importProfileJson, validateProfile, expandSequence,
-  SPLIT_STRATEGIES, CONDITION_OPS, CONDITION_FIELDS, INTERNAL_FIELDS, LAN_LAYOUTS,
+  SPLIT_STRATEGIES, CONDITION_OPS, CONDITION_FIELDS, INTERNAL_FIELDS, LAN_LAYOUTS, PORT_KINDS, PORT_KIND_SETS,
 } from './import-profiles.js';
 import {
   cleanTable, analyzeCsv, buildModuleImportRows, buildInterfaceRename, readInterfaceTable,
@@ -129,7 +129,7 @@ function runAnalysis() {
     return;
   }
   S.analysis = analyzeCsv(S.table, profile);
-  S.rename = null;
+  S.renames = {};
   $('mi-pv-filter').value = 'all';
   renderPreview();
   showStep(2);
@@ -197,12 +197,12 @@ function renderGeneral(d) {
         <input type="text" data-k="lan_fill_name" value="${esc(d.lan_fill_name)}"></div>` : ''}
     </div>
     ${d.lan_layout !== 'custom' ? `<p class="settings-section-desc">${esc(t('mi_ed_lan_layout_hint'))}</p>` : ''}
-    <div class="form-row">
-      <div class="form-group"><label>${esc(t('mi_ed_bay_pattern'))}</label>
-        <input type="text" data-k="bay_name_pattern" value="${esc(d.bay_name_pattern)}"></div>
-      <div class="form-group"><label>${esc(t('mi_ed_iface_template'))}</label>
-        <input type="text" data-k="interface_name_template" value="${esc(d.interface_name_template)}"></div>
-    </div>
+    <div class="form-group"><label>${esc(t('mi_ed_bay_pattern'))}</label>
+      <input type="text" data-k="bay_name_pattern" value="${esc(d.bay_name_pattern)}"></div>
+    <div class="form-group"><label>${esc(t('mi_ed_port_kind'))}</label>
+      ${selectHtml(Object.keys(PORT_KIND_SETS), d.port_kind, 'data-k="port_kind" data-rerender="1"', k => t('mi_pk_set_' + k))}</div>
+    ${(PORT_KIND_SETS[d.port_kind] || []).map(kind => `<div class="form-group"><label>${esc(t('mi_ed_tpl_' + kind))}</label>
+      <input type="text" data-k="${PORT_KINDS[kind].template}" value="${esc(d[PORT_KINDS[kind].template])}"></div>`).join('')}
     <p class="settings-section-desc">${esc(t('mi_ed_iface_hint'))}</p>`;
 }
 
@@ -489,36 +489,51 @@ function renderExport() {
   $('mi-ex-devices').disabled = missing.length > 0;
 }
 
-// ─── Step 4: interface IDs ───────────────────────────────────────────────────
+// ─── Step 4: port IDs (front ports, rear ports or interfaces) ────────────────
 
-function renderRenameResult() {
-  const r = S.rename;
-  const box = $('mi-if-result');
-  if (!r) { box.innerHTML = ''; $('mi-if-download').disabled = true; $('mi-if-zip').disabled = true; return; }
-  const unmatched = r.unmatched.slice(0, 15).map(u => `${esc(u.device)} · ${esc(u.expected)}`).join('<br>');
-  box.innerHTML = `
-    <div class="message ${r.unmatched.length ? 'message-info' : 'message-success'}">
-      ${esc(t('mi_if_result', { matched: r.rows.length, unchanged: r.unchanged, unmatched: r.unmatched.length }))}
-      ${r.unmatched.length ? `<br><small>${esc(t('mi_if_unmatched_title'))}</small><br><small>${unmatched}${r.unmatched.length > 15 ? '<br>…' : ''}</small>` : ''}
-    </div>`;
-  $('mi-if-download').disabled = r.rows.length === 0;
-  $('mi-if-zip').disabled = false;
+function portKinds() {
+  return PORT_KIND_SETS[activeProfile().port_kind] || PORT_KIND_SETS.front_rear;
 }
 
-function applyInterfaces(interfaces) {
-  S.rename = buildInterfaceRename(S.analysis.devices, activeProfile(), interfaces);
-  renderRenameResult();
+function renderKinds() {
+  const kinds = portKinds();
+  $('mi-if-kinds').innerHTML = kinds.map(kind => {
+    const r = S.renames[kind];
+    let result = '';
+    if (r) {
+      const unmatched = r.unmatched.slice(0, 15).map(u => `${esc(u.device)} · ${esc(u.expected)}`).join('<br>');
+      result = `
+        <div class="message ${r.unmatched.length ? 'message-info' : 'message-success'}">
+          ${esc(t('mi_if_result', { matched: r.rows.length, unchanged: r.unchanged, unmatched: r.unmatched.length }))}
+          ${r.unmatched.length ? `<br><small>${esc(t('mi_if_unmatched_title'))}</small><br><small>${unmatched}${r.unmatched.length > 15 ? '<br>…' : ''}</small>` : ''}
+        </div>`;
+    }
+    return `<div class="mi-item" data-kind="${kind}">
+      <div class="mi-item-head"><strong>${esc(t('mi_pk_' + kind))}</strong></div>
+      <div class="mi-toolbar">
+        <button type="button" class="btn btn-secondary btn-sm" data-act="upload-kind">${esc(t('mi_if_upload_kind', { kind: t('mi_pk_' + kind) }))}</button>
+        <button type="button" class="btn btn-success btn-sm" data-act="download-kind" ${r && r.rows.length ? '' : 'disabled'}>${esc(t('mi_if_download_kind', { file: PORT_KINDS[kind].file }))}</button>
+      </div>
+      ${result}
+    </div>`;
+  }).join('');
+  $('mi-if-zip').disabled = !kinds.some(k => S.renames[k]);
+}
+
+function applyPorts(kind, items) {
+  S.renames[kind] = buildInterfaceRename(S.analysis.devices, activeProfile(), items, kind);
+  renderKinds();
 }
 
 function renderInterfaceStep() {
-  const expected = expectedInterfaces(S.analysis.devices, activeProfile());
-  const none = expected.length === 0;
+  const none = expectedInterfaces(S.analysis.devices, activeProfile()).length === 0;
   $('mi-if-none').hidden = !none;
   $('mi-if-actions').hidden = none;
-  renderRenameResult();
+  $('mi-if-kinds').hidden = none;
+  renderKinds();
 }
 
-async function fetchInterfacesFromApi() {
+async function fetchPortsFromApi() {
   const { baseUrl, token } = await getApiCredentials();
   if (!baseUrl || !token) { uiAlert(t('netbox_api_missing_creds')); return; }
   const names = [...new Set(expectedInterfaces(S.analysis.devices, activeProfile()).map(e => e.device))];
@@ -527,13 +542,15 @@ async function fetchInterfacesFromApi() {
   btn.disabled = true;
   btn.textContent = t('netbox_api_fetching');
   try {
-    const all = [];
-    for (let i = 0; i < names.length; i += 20) {
-      const query = names.slice(i, i + 20).map(n => `device=${encodeURIComponent(n)}`).join('&');
-      const items = await apiFetchPages(baseUrl, token, 'dcim/interfaces', query);
-      for (const it of items) all.push({ id: String(it.id), device: it.device?.name || '', name: it.name });
+    for (const kind of portKinds()) {
+      const all = [];
+      for (let i = 0; i < names.length; i += 20) {
+        const query = names.slice(i, i + 20).map(n => `device=${encodeURIComponent(n)}`).join('&');
+        const items = await apiFetchPages(baseUrl, token, PORT_KINDS[kind].endpoint, query);
+        for (const it of items) all.push({ id: String(it.id), device: it.device?.name || '', name: it.name });
+      }
+      applyPorts(kind, all);
     }
-    applyInterfaces(all);
   } catch (err) {
     uiAlert(err instanceof TypeError ? t('netbox_api_cors_error') : `${t('netbox_api_error')}: ${err.message}`);
   } finally {
@@ -542,16 +559,16 @@ async function fetchInterfacesFromApi() {
   }
 }
 
-async function onInterfaceFile(file) {
-  if (!file) return;
+async function onPortFile(kind, file) {
+  if (!file || !kind) return;
   const table = parseCsvTable(await readTextFile(file));
   const { interfaces, missing } = readInterfaceTable(table);
   if (missing.length) { uiAlert(t('mi_if_missing_cols', { cols: missing.join(', ') })); return; }
-  applyInterfaces(interfaces);
+  applyPorts(kind, interfaces);
 }
 
-function renameCsv() {
-  return writeCsv(S.rename.rows, INTERFACE_RENAME_HEADERS);
+function renameCsv(kind) {
+  return writeCsv(S.renames[kind].rows, INTERFACE_RENAME_HEADERS);
 }
 
 // ─── Init ────────────────────────────────────────────────────────────────────
@@ -647,18 +664,25 @@ export function initModuleImport() {
   $('mi-ex-next').addEventListener('click', () => { renderInterfaceStep(); showStep(4); });
 
   // Interfaces
-  $('mi-if-api-btn').addEventListener('click', fetchInterfacesFromApi);
-  $('mi-if-file-btn').addEventListener('click', () => $('mi-if-file').click());
+  $('mi-if-api-btn').addEventListener('click', fetchPortsFromApi);
+  $('mi-if-kinds').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-act]');
+    const kind = btn?.closest('[data-kind]')?.dataset.kind;
+    if (!btn || !kind) return;
+    if (btn.dataset.act === 'upload-kind') { S.uploadKind = kind; $('mi-if-file').click(); }
+    else if (btn.dataset.act === 'download-kind') triggerDownload(renameCsv(kind), PORT_KINDS[kind].file, 'text/csv');
+  });
   $('mi-if-file').addEventListener('change', async e => {
     const file = e.target.files[0];
     e.target.value = '';
-    await onInterfaceFile(file);
+    await onPortFile(S.uploadKind, file);
   });
-  $('mi-if-download').addEventListener('click', () =>
-    triggerDownload(renameCsv(), 'interface-rename.csv', 'text/csv'));
   $('mi-if-zip').addEventListener('click', () => {
     const files = importFiles();
-    if (S.rename && S.rename.rows.length) files.push({ name: 'interface-rename.csv', data: renameCsv() });
+    for (const kind of portKinds()) {
+      const r = S.renames[kind];
+      if (r && r.rows.length) files.push({ name: PORT_KINDS[kind].file, data: renameCsv(kind) });
+    }
     triggerDownload(createZip(files), 'module-import-bundle.zip', 'application/zip');
   });
   $('mi-if-back').addEventListener('click', () => showStep(3));

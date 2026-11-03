@@ -8,11 +8,11 @@ import {
   analyzeCsv, cleanTable, composeSizes, parseNumeric, buildModuleImportRows,
   buildInterfaceRename, readInterfaceTable, expectedInterfaces,
   MODULE_IMPORT_HEADERS, INTERFACE_RENAME_HEADERS,
-  buildDeviceImportRows, deviceImportHeaders, missingDeviceFields,
+  buildDeviceImportRows, deviceImportHeaders, missingDeviceFields, expectedPorts,
 } from '../js/import-engine.js';
 import {
   createSeedProfile, validateProfile, duplicateProfile, exportProfileJson, importProfileJson,
-  loadProfiles, saveProfiles, PROFILES_KEY, expandSequence, normalizeProfile, NAME_MODIFIERS, parsePlaceholder,
+  loadProfiles, saveProfiles, PROFILES_KEY, expandSequence, normalizeProfile, NAME_MODIFIERS, parsePlaceholder, PORT_KINDS, PORT_KIND_SETS,
 } from '../js/import-profiles.js';
 
 import { netboxAuthHeader } from '../js/utils.js';
@@ -531,4 +531,34 @@ test('NetBox auth header: v2 tokens use Bearer, v1 tokens use Token, pasted head
   assert.equal(netboxAuthHeader('Bearer nbt_x.y'), 'Bearer nbt_x.y');
   assert.equal(netboxAuthHeader('Token abc'), 'Token abc');
   assert.equal(netboxAuthHeader(''), 'Token ');
+});
+
+// ── port kinds (front ports / rear ports / interfaces) ──
+test('port kinds: default is front + rear ports, each with its own endpoint, template and file', () => {
+  assert.deepEqual(PORT_KIND_SETS.front_rear, ['front_port', 'rear_port']);
+  assert.equal(PORT_KINDS.front_port.endpoint, 'dcim/front-ports');
+  assert.equal(PORT_KINDS.rear_port.endpoint, 'dcim/rear-ports');
+  assert.equal(PORT_KINDS.interface.endpoint, 'dcim/interfaces');
+  assert.equal(new Set(Object.values(PORT_KINDS).map(k => k.file)).size, 3);
+  assert.equal(createSeedProfile().port_kind, 'front_rear');
+  const n = normalizeProfile({ splitRules: [], interface_name_template: 'X{module}-{n}' });
+  assert.equal(n.port_kind, 'front_rear');
+  assert.equal(n.front_port_name_template, 'X{module}-{n}');
+  assert.deepEqual(validateProfile({ ...profile, port_kind: 'bogus' }).errors.map(e => e.code).filter(c => c === 'port_kind_invalid'), ['port_kind_invalid']);
+  assert.ok(!validateProfile(profile).errors.some(e => e.code === 'port_kind_invalid'));
+});
+
+test('rename rows are built per port kind from that kind\'s template', () => {
+  const p = { ...customProfile, front_port_name_template: 'Front {module}.{n}', rear_port_name_template: 'Rear {module}.{n}' };
+  const a = devC('Raum 1, EG Bodentank A');
+  assert.deepEqual(expectedPorts([a], p, 'front_port').map(e => e.expected), ['Front 1.1', 'Front 1.2', 'Front 1.3', 'Front 2.1', 'Front 2.2']);
+  assert.deepEqual(expectedPorts([a], p, 'rear_port').map(e => e.expected).slice(0, 2), ['Rear 1.1', 'Rear 1.2']);
+  const front = [{ id: '11', device: a.name, name: 'Front 1.1' }, { id: '12', device: a.name, name: 'Front 1.2' }];
+  const rf = buildInterfaceRename([a], p, front, 'front_port');
+  assert.deepEqual(rf.rows, [{ id: '11', name: 'P1' }, { id: '12', name: 'P2' }]);
+  assert.equal(rf.unmatched.length, 3);
+  // the same rows must not match when looked up as rear ports
+  assert.equal(buildInterfaceRename([a], p, front, 'rear_port').rows.length, 0);
+  // interfaces keep working as before
+  assert.equal(expectedPorts([a], p, 'interface')[0].expected, 'Gi1/0/1');
 });

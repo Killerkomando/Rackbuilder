@@ -3369,15 +3369,13 @@ dialog.ui-dialog:not([open]) { display: none; }
     <div id="mi-if-actions">
       <div class="mi-toolbar">
         <button type="button" class="btn btn-secondary" id="mi-if-api-btn" data-i18n="mi_if_api_btn">Fetch from NetBox API</button>
-        <button type="button" class="btn btn-secondary" id="mi-if-file-btn" data-i18n="mi_if_file_btn">Upload interface export (CSV)</button>
         <input type="file" id="mi-if-file" accept=".csv,.tsv,.txt" style="display:none">
       </div>
-      <p class="settings-section-desc" data-i18n="mi_if_api_hint">The API option uses the URL and token from Settings → NetBox and needs CORS to be allowed. The file upload always works: export the interfaces (with the ID column) from NetBox.</p>
+      <p class="settings-section-desc" data-i18n="mi_if_api_hint">The API option uses the URL and token from Settings → NetBox and needs CORS to be allowed. The file upload always works: export the ports (with the ID column) from NetBox (Devices → Front Ports / Rear Ports / Interfaces).</p>
     </div>
-    <div id="mi-if-result"></div>
+    <div id="mi-if-kinds"></div>
     <div class="mi-toolbar">
-      <button type="button" class="btn btn-success" id="mi-if-download" disabled data-i18n="mi_if_download">Download interface-rename.csv</button>
-      <button type="button" class="btn btn-secondary" id="mi-if-zip" disabled data-i18n="mi_if_zip">Download both as ZIP</button>
+      <button type="button" class="btn btn-secondary" id="mi-if-zip" disabled data-i18n="mi_if_zip">Download all as ZIP</button>
     </div>
     <div class="mi-actions">
       <button type="button" class="btn btn-secondary" id="mi-if-back" data-i18n="mi_ex_back">Back</button>
@@ -3972,6 +3970,20 @@ const translations = {
     mi_ed_slots: 'Module bays',
     mi_ed_role: 'Device role',
     mi_ed_manufacturer: 'Manufacturer',
+    mi_ed_port_kind: 'LAN ports in NetBox are …',
+    mi_pk_set_front_rear: 'Front and rear ports',
+    mi_pk_set_front_port: 'Front ports only',
+    mi_pk_set_rear_port: 'Rear ports only',
+    mi_pk_set_interface: 'Interfaces',
+    mi_pk_front_port: 'Front ports',
+    mi_pk_rear_port: 'Rear ports',
+    mi_pk_interface: 'Interfaces',
+    mi_ed_tpl_interface: 'Interface name template ({module} = bay position, {n} = port number)',
+    mi_ed_tpl_front_port: 'Front port name template ({module} = bay position, {n} = port number)',
+    mi_ed_tpl_rear_port: 'Rear port name template ({module} = bay position, {n} = port number)',
+    mi_val_port_kind_invalid: 'Unknown port type for renaming.',
+    mi_if_upload_kind: 'Upload {kind} export (CSV)',
+    mi_if_download_kind: 'Download {file}',
     mi_ed_name_pattern: 'Device name pattern (empty = row name + prefix)',
     mi_ed_site_abbr: 'Site abbreviation (for {site_abbr})',
     mi_ed_name_pattern_hint: 'Placeholders: {site_abbr}, {site}, {block} (block letter), {row} (value of the row name column), {prefix} (prefix pattern) and {col:Column name} for any CSV column. Modifiers after | change the case or format: upper, lower, title, nospace, slug (letters, digits, hyphens), digits (digits only); chain them, e.g. {col:Raum|nospace|lower}. Other text is kept as typed. Example: cool-{col:Raum|lower}-BT{block|upper}. Device names must be unique.',
@@ -4053,16 +4065,16 @@ const translations = {
     mi_ex_download_zip: 'Download as ZIP',
     mi_ex_back: 'Back',
     mi_ex_next: 'Next: interface IDs',
-    mi_if_intro: 'After NetBox created the modules, the LAN interfaces need their real port names. Get the interface IDs from NetBox:',
+    mi_if_intro: 'After NetBox created the modules, the LAN ports need their real names. Get the IDs of the ports from NetBox:',
     mi_if_no_lan: 'None of the devices has LAN modules, so there is nothing to rename.',
     mi_if_api_btn: 'Fetch from NetBox API',
     mi_if_file_btn: 'Upload interface export (CSV)',
-    mi_if_api_hint: 'The API option uses the URL and token from Settings → NetBox and needs CORS to be allowed. The file upload always works: export the interfaces (with the ID column) from NetBox.',
+    mi_if_api_hint: 'The API option uses the URL and token from Settings → NetBox and needs CORS to be allowed. The file upload always works: export the ports (with the ID column) from NetBox (Devices → Front Ports / Rear Ports / Interfaces).',
     mi_if_result: '{matched} renames · {unchanged} already correct · {unmatched} not found',
     mi_if_unmatched_title: 'Not found in NetBox (device · expected name):',
     mi_if_missing_cols: 'Missing columns in the file: {cols}',
     mi_if_download: 'Download interface-rename.csv',
-    mi_if_zip: 'Download both as ZIP',
+    mi_if_zip: 'Download all as ZIP',
     mi_err_no_rule: 'No rule matches {category} ({size} ports {color}).',
     mi_err_bay_out_of_range: 'Rule matches, but its bay range is outside the device ({category}, {size} ports).',
     mi_err_no_free_bay: 'No free bay left in the allowed range ({category}, {size} ports {color}).',
@@ -4403,6 +4415,20 @@ const translations = {
     mi_ed_slots: 'Modul-Bays',
     mi_ed_role: 'Geräterolle',
     mi_ed_manufacturer: 'Hersteller',
+    mi_ed_port_kind: 'LAN-Ports sind in NetBox …',
+    mi_pk_set_front_rear: 'Front- und Rear-Ports',
+    mi_pk_set_front_port: 'Nur Front-Ports',
+    mi_pk_set_rear_port: 'Nur Rear-Ports',
+    mi_pk_set_interface: 'Interfaces',
+    mi_pk_front_port: 'Front-Ports',
+    mi_pk_rear_port: 'Rear-Ports',
+    mi_pk_interface: 'Interfaces',
+    mi_ed_tpl_interface: 'Interface-Namensvorlage ({module} = Bay-Position, {n} = Portnummer)',
+    mi_ed_tpl_front_port: 'Front-Port-Namensvorlage ({module} = Bay-Position, {n} = Portnummer)',
+    mi_ed_tpl_rear_port: 'Rear-Port-Namensvorlage ({module} = Bay-Position, {n} = Portnummer)',
+    mi_val_port_kind_invalid: 'Unbekannte Port-Art zum Umbenennen.',
+    mi_if_upload_kind: '{kind}-Export (CSV) hochladen',
+    mi_if_download_kind: '{file} herunterladen',
     mi_ed_name_pattern: 'Gerätenamen-Muster (leer = Zeilenname + Präfix)',
     mi_ed_site_abbr: 'Standort-Kürzel (für {site_abbr})',
     mi_ed_name_pattern_hint: 'Platzhalter: {site_abbr}, {site}, {block} (Block-Buchstabe), {row} (Wert der Zeilennamen-Spalte), {prefix} (Präfix-Muster) und {col:Spaltenname} für jede CSV-Spalte. Modifikatoren nach | ändern Groß-/Kleinschreibung oder Format: upper, lower, title, nospace, slug (Buchstaben, Ziffern, Bindestriche), digits (nur Ziffern); verkettbar, z. B. {col:Raum|nospace|lower}. Anderer Text bleibt wie eingegeben. Beispiel: cool-{col:Raum|lower}-BT{block|upper}. Gerätenamen müssen eindeutig sein.',
@@ -4484,16 +4510,16 @@ const translations = {
     mi_ex_download_zip: 'Als ZIP herunterladen',
     mi_ex_back: 'Zurück',
     mi_ex_next: 'Weiter: Interface-IDs',
-    mi_if_intro: 'Nachdem NetBox die Module angelegt hat, brauchen die LAN-Interfaces ihre echten Portnamen. Hole die Interface-IDs aus NetBox:',
+    mi_if_intro: 'Nachdem NetBox die Module angelegt hat, brauchen die LAN-Ports ihre echten Namen. Hole die IDs der Ports aus NetBox:',
     mi_if_no_lan: 'Kein Gerät hat LAN-Module, es gibt nichts umzubenennen.',
     mi_if_api_btn: 'Per NetBox-API abrufen',
     mi_if_file_btn: 'Interface-Export hochladen (CSV)',
-    mi_if_api_hint: 'Die API-Variante nutzt URL und Token aus Einstellungen → NetBox und braucht erlaubtes CORS. Der Datei-Upload funktioniert immer: Exportiere die Interfaces (mit ID-Spalte) aus NetBox.',
+    mi_if_api_hint: 'Die API-Variante nutzt URL und Token aus Einstellungen → NetBox und braucht erlaubtes CORS. Der Datei-Upload funktioniert immer: Exportiere die Ports (mit ID-Spalte) aus NetBox (Geräte → Front-Ports / Rear-Ports / Interfaces).',
     mi_if_result: '{matched} Umbenennungen · {unchanged} bereits korrekt · {unmatched} nicht gefunden',
     mi_if_unmatched_title: 'In NetBox nicht gefunden (Gerät · erwarteter Name):',
     mi_if_missing_cols: 'Fehlende Spalten in der Datei: {cols}',
     mi_if_download: 'interface-rename.csv herunterladen',
-    mi_if_zip: 'Beide als ZIP herunterladen',
+    mi_if_zip: 'Alle als ZIP herunterladen',
     mi_err_no_rule: 'Keine Regel passt zu {category} ({size} Ports {color}).',
     mi_err_bay_out_of_range: 'Regel passt, aber der Bay-Bereich liegt außerhalb des Geräts ({category}, {size} Ports).',
     mi_err_no_free_bay: 'Keine freie Bay im erlaubten Bereich ({category}, {size} Ports {color}).',
@@ -7986,6 +8012,9 @@ function createEmptyProfile(name = 'New profile') {
     slot_count: 12,
     bay_name_pattern: '{n}',
     interface_name_template: 'Gi{module}/0/{n}',
+    port_kind: 'front_rear',
+    front_port_name_template: 'Gi{module}/0/{n}',
+    rear_port_name_template: 'Gi{module}/0/{n}',
     lan_layout: '2',
     lan_fill_name: 'unknown',
     created_at: new Date().toISOString(),
@@ -8036,6 +8065,23 @@ function createSeedProfile() {
 
 const LAN_LAYOUTS = ['2', '3', 'custom'];
 
+const DEFAULT_PORT_TEMPLATE = 'Gi{module}/0/{n}';
+
+/** NetBox objects the LAN ports of a module can be: API endpoint, the profile field with the expected-name template, export file name. */
+const PORT_KINDS = {
+  interface:  { endpoint: 'dcim/interfaces',  template: 'interface_name_template',  file: 'interface-rename.csv' },
+  front_port: { endpoint: 'dcim/front-ports', template: 'front_port_name_template', file: 'front-port-rename.csv' },
+  rear_port:  { endpoint: 'dcim/rear-ports',  template: 'rear_port_name_template',  file: 'rear-port-rename.csv' },
+};
+
+/** Profile choice `port_kind` → the kinds that get a rename file. */
+const PORT_KIND_SETS = {
+  front_rear: ['front_port', 'rear_port'],
+  front_port: ['front_port'],
+  rear_port: ['rear_port'],
+  interface: ['interface'],
+};
+
 /**
  * Fill in fields added after a profile was saved. Profiles without the LAN layout option keep
  * working as before when they define explicit port splits ("custom"), otherwise they get the default.
@@ -8045,6 +8091,8 @@ function normalizeProfile(p) {
   if (p.lan_fill_name === undefined) p.lan_fill_name = 'unknown';
   for (const k of ['netbox_role', 'netbox_manufacturer', 'netbox_site', 'netbox_location', 'location_column', 'device_name_pattern', 'site_abbr']) if (p[k] === undefined) p[k] = '';
   if (p.device_status === undefined) p.device_status = 'active';
+  if (p.port_kind === undefined) p.port_kind = 'front_rear';
+  for (const k of ['front_port_name_template', 'rear_port_name_template']) if (p[k] === undefined) p[k] = p.interface_name_template || DEFAULT_PORT_TEMPLATE;
   return p;
 }
 
@@ -8125,6 +8173,7 @@ function validateProfile(profile, knownModuleTypes = []) {
   const slots = Number(profile.slot_count);
   if (!Number.isInteger(slots) || slots < 1 || slots > 99) err('slot_count_invalid');
   if (!SPLIT_STRATEGIES.includes(profile.default_split_strategy)) err('strategy_invalid');
+  if (!Object.hasOwn(PORT_KIND_SETS, profile.port_kind)) err('port_kind_invalid');
   if (!LAN_LAYOUTS.includes(profile.lan_layout)) err('lan_layout_invalid');
   else if (profile.lan_layout !== 'custom') {
     if (!String(profile.lan_fill_name ?? '').trim()) err('lan_fill_required');
@@ -8681,10 +8730,11 @@ function buildDeviceImportRows(devices, profile) {
 }
 
 /**
- * Interfaces NetBox will create for LAN modules, with the target name from the source file.
+ * Ports NetBox will create for LAN modules (interfaces, front ports or rear ports), with the target name from the source file.
  * @returns {Array<{device:string, bay:number, expected:string, newName:string}>}
  */
-function expectedInterfaces(devices, profile) {
+function expectedPorts(devices, profile, kind = 'interface') {
+  const template = profile[PORT_KINDS[kind].template] || DEFAULT_PORT_TEMPLATE;
   const out = [];
   for (const d of devices) {
     for (const b of d.bays) {
@@ -8693,13 +8743,18 @@ function expectedInterfaces(devices, profile) {
         out.push({
           device: d.name,
           bay: b.bay,
-          expected: fillPattern(profile.interface_name_template || 'Gi{module}/0/{n}', { module: b.bay, n: i + 1 }),
+          expected: fillPattern(template, { module: b.bay, n: i + 1 }),
           newName: portName,
         });
       });
     }
   }
   return out;
+}
+
+/** Interfaces NetBox will create for LAN modules (see expectedPorts). */
+function expectedInterfaces(devices, profile) {
+  return expectedPorts(devices, profile, 'interface');
 }
 
 /**
@@ -8723,7 +8778,7 @@ function readInterfaceTable(table) {
  * Match expected interfaces to NetBox interfaces (device + name) and build the rename rows.
  * @returns {{rows: Array<{id:string,name:string}>, unmatched: object[], unchanged: number}}
  */
-function buildInterfaceRename(devices, profile, interfaces) {
+function buildInterfaceRename(devices, profile, interfaces, kind = 'interface') {
   const byKey = new Map();
   for (const i of interfaces) {
     const key = `${i.device}\u0000${i.name}`;
@@ -8732,7 +8787,7 @@ function buildInterfaceRename(devices, profile, interfaces) {
   const rows = [];
   const unmatched = [];
   let unchanged = 0;
-  for (const e of expectedInterfaces(devices, profile)) {
+  for (const e of expectedPorts(devices, profile, kind)) {
     const hit = byKey.get(`${e.device}\u0000${e.expected}`);
     if (!hit) { unmatched.push(e); continue; }
     if (hit.name === e.newName) { unchanged++; continue; }
@@ -8858,7 +8913,7 @@ function runAnalysis() {
     return;
   }
   S.analysis = analyzeCsv(S.table, profile);
-  S.rename = null;
+  S.renames = {};
   $('mi-pv-filter').value = 'all';
   renderPreview();
   showStep(2);
@@ -8926,12 +8981,12 @@ function renderGeneral(d) {
         <input type="text" data-k="lan_fill_name" value="${esc(d.lan_fill_name)}"></div>` : ''}
     </div>
     ${d.lan_layout !== 'custom' ? `<p class="settings-section-desc">${esc(t('mi_ed_lan_layout_hint'))}</p>` : ''}
-    <div class="form-row">
-      <div class="form-group"><label>${esc(t('mi_ed_bay_pattern'))}</label>
-        <input type="text" data-k="bay_name_pattern" value="${esc(d.bay_name_pattern)}"></div>
-      <div class="form-group"><label>${esc(t('mi_ed_iface_template'))}</label>
-        <input type="text" data-k="interface_name_template" value="${esc(d.interface_name_template)}"></div>
-    </div>
+    <div class="form-group"><label>${esc(t('mi_ed_bay_pattern'))}</label>
+      <input type="text" data-k="bay_name_pattern" value="${esc(d.bay_name_pattern)}"></div>
+    <div class="form-group"><label>${esc(t('mi_ed_port_kind'))}</label>
+      ${selectHtml(Object.keys(PORT_KIND_SETS), d.port_kind, 'data-k="port_kind" data-rerender="1"', k => t('mi_pk_set_' + k))}</div>
+    ${(PORT_KIND_SETS[d.port_kind] || []).map(kind => `<div class="form-group"><label>${esc(t('mi_ed_tpl_' + kind))}</label>
+      <input type="text" data-k="${PORT_KINDS[kind].template}" value="${esc(d[PORT_KINDS[kind].template])}"></div>`).join('')}
     <p class="settings-section-desc">${esc(t('mi_ed_iface_hint'))}</p>`;
 }
 
@@ -9218,36 +9273,51 @@ function renderExport() {
   $('mi-ex-devices').disabled = missing.length > 0;
 }
 
-// ─── Step 4: interface IDs ───────────────────────────────────────────────────
+// ─── Step 4: port IDs (front ports, rear ports or interfaces) ────────────────
 
-function renderRenameResult() {
-  const r = S.rename;
-  const box = $('mi-if-result');
-  if (!r) { box.innerHTML = ''; $('mi-if-download').disabled = true; $('mi-if-zip').disabled = true; return; }
-  const unmatched = r.unmatched.slice(0, 15).map(u => `${esc(u.device)} · ${esc(u.expected)}`).join('<br>');
-  box.innerHTML = `
-    <div class="message ${r.unmatched.length ? 'message-info' : 'message-success'}">
-      ${esc(t('mi_if_result', { matched: r.rows.length, unchanged: r.unchanged, unmatched: r.unmatched.length }))}
-      ${r.unmatched.length ? `<br><small>${esc(t('mi_if_unmatched_title'))}</small><br><small>${unmatched}${r.unmatched.length > 15 ? '<br>…' : ''}</small>` : ''}
-    </div>`;
-  $('mi-if-download').disabled = r.rows.length === 0;
-  $('mi-if-zip').disabled = false;
+function portKinds() {
+  return PORT_KIND_SETS[activeProfile().port_kind] || PORT_KIND_SETS.front_rear;
 }
 
-function applyInterfaces(interfaces) {
-  S.rename = buildInterfaceRename(S.analysis.devices, activeProfile(), interfaces);
-  renderRenameResult();
+function renderKinds() {
+  const kinds = portKinds();
+  $('mi-if-kinds').innerHTML = kinds.map(kind => {
+    const r = S.renames[kind];
+    let result = '';
+    if (r) {
+      const unmatched = r.unmatched.slice(0, 15).map(u => `${esc(u.device)} · ${esc(u.expected)}`).join('<br>');
+      result = `
+        <div class="message ${r.unmatched.length ? 'message-info' : 'message-success'}">
+          ${esc(t('mi_if_result', { matched: r.rows.length, unchanged: r.unchanged, unmatched: r.unmatched.length }))}
+          ${r.unmatched.length ? `<br><small>${esc(t('mi_if_unmatched_title'))}</small><br><small>${unmatched}${r.unmatched.length > 15 ? '<br>…' : ''}</small>` : ''}
+        </div>`;
+    }
+    return `<div class="mi-item" data-kind="${kind}">
+      <div class="mi-item-head"><strong>${esc(t('mi_pk_' + kind))}</strong></div>
+      <div class="mi-toolbar">
+        <button type="button" class="btn btn-secondary btn-sm" data-act="upload-kind">${esc(t('mi_if_upload_kind', { kind: t('mi_pk_' + kind) }))}</button>
+        <button type="button" class="btn btn-success btn-sm" data-act="download-kind" ${r && r.rows.length ? '' : 'disabled'}>${esc(t('mi_if_download_kind', { file: PORT_KINDS[kind].file }))}</button>
+      </div>
+      ${result}
+    </div>`;
+  }).join('');
+  $('mi-if-zip').disabled = !kinds.some(k => S.renames[k]);
+}
+
+function applyPorts(kind, items) {
+  S.renames[kind] = buildInterfaceRename(S.analysis.devices, activeProfile(), items, kind);
+  renderKinds();
 }
 
 function renderInterfaceStep() {
-  const expected = expectedInterfaces(S.analysis.devices, activeProfile());
-  const none = expected.length === 0;
+  const none = expectedInterfaces(S.analysis.devices, activeProfile()).length === 0;
   $('mi-if-none').hidden = !none;
   $('mi-if-actions').hidden = none;
-  renderRenameResult();
+  $('mi-if-kinds').hidden = none;
+  renderKinds();
 }
 
-async function fetchInterfacesFromApi() {
+async function fetchPortsFromApi() {
   const { baseUrl, token } = await getApiCredentials();
   if (!baseUrl || !token) { uiAlert(t('netbox_api_missing_creds')); return; }
   const names = [...new Set(expectedInterfaces(S.analysis.devices, activeProfile()).map(e => e.device))];
@@ -9256,13 +9326,15 @@ async function fetchInterfacesFromApi() {
   btn.disabled = true;
   btn.textContent = t('netbox_api_fetching');
   try {
-    const all = [];
-    for (let i = 0; i < names.length; i += 20) {
-      const query = names.slice(i, i + 20).map(n => `device=${encodeURIComponent(n)}`).join('&');
-      const items = await apiFetchPages(baseUrl, token, 'dcim/interfaces', query);
-      for (const it of items) all.push({ id: String(it.id), device: it.device?.name || '', name: it.name });
+    for (const kind of portKinds()) {
+      const all = [];
+      for (let i = 0; i < names.length; i += 20) {
+        const query = names.slice(i, i + 20).map(n => `device=${encodeURIComponent(n)}`).join('&');
+        const items = await apiFetchPages(baseUrl, token, PORT_KINDS[kind].endpoint, query);
+        for (const it of items) all.push({ id: String(it.id), device: it.device?.name || '', name: it.name });
+      }
+      applyPorts(kind, all);
     }
-    applyInterfaces(all);
   } catch (err) {
     uiAlert(err instanceof TypeError ? t('netbox_api_cors_error') : `${t('netbox_api_error')}: ${err.message}`);
   } finally {
@@ -9271,16 +9343,16 @@ async function fetchInterfacesFromApi() {
   }
 }
 
-async function onInterfaceFile(file) {
-  if (!file) return;
+async function onPortFile(kind, file) {
+  if (!file || !kind) return;
   const table = parseCsvTable(await readTextFile(file));
   const { interfaces, missing } = readInterfaceTable(table);
   if (missing.length) { uiAlert(t('mi_if_missing_cols', { cols: missing.join(', ') })); return; }
-  applyInterfaces(interfaces);
+  applyPorts(kind, interfaces);
 }
 
-function renameCsv() {
-  return writeCsv(S.rename.rows, INTERFACE_RENAME_HEADERS);
+function renameCsv(kind) {
+  return writeCsv(S.renames[kind].rows, INTERFACE_RENAME_HEADERS);
 }
 
 // ─── Init ────────────────────────────────────────────────────────────────────
@@ -9376,18 +9448,25 @@ function initModuleImport() {
   $('mi-ex-next').addEventListener('click', () => { renderInterfaceStep(); showStep(4); });
 
   // Interfaces
-  $('mi-if-api-btn').addEventListener('click', fetchInterfacesFromApi);
-  $('mi-if-file-btn').addEventListener('click', () => $('mi-if-file').click());
+  $('mi-if-api-btn').addEventListener('click', fetchPortsFromApi);
+  $('mi-if-kinds').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-act]');
+    const kind = btn?.closest('[data-kind]')?.dataset.kind;
+    if (!btn || !kind) return;
+    if (btn.dataset.act === 'upload-kind') { S.uploadKind = kind; $('mi-if-file').click(); }
+    else if (btn.dataset.act === 'download-kind') triggerDownload(renameCsv(kind), PORT_KINDS[kind].file, 'text/csv');
+  });
   $('mi-if-file').addEventListener('change', async e => {
     const file = e.target.files[0];
     e.target.value = '';
-    await onInterfaceFile(file);
+    await onPortFile(S.uploadKind, file);
   });
-  $('mi-if-download').addEventListener('click', () =>
-    triggerDownload(renameCsv(), 'interface-rename.csv', 'text/csv'));
   $('mi-if-zip').addEventListener('click', () => {
     const files = importFiles();
-    if (S.rename && S.rename.rows.length) files.push({ name: 'interface-rename.csv', data: renameCsv() });
+    for (const kind of portKinds()) {
+      const r = S.renames[kind];
+      if (r && r.rows.length) files.push({ name: PORT_KINDS[kind].file, data: renameCsv(kind) });
+    }
     triggerDownload(createZip(files), 'module-import-bundle.zip', 'application/zip');
   });
   $('mi-if-back').addEventListener('click', () => showStep(3));
@@ -10093,7 +10172,7 @@ const APP_VERSION = '0.9.0';
 const APP_CODENAME = 'Patchkabel';
 
 // Name of the service-worker cache that ships with this version (must equal CACHE_NAME in sw.js).
-const EXPECTED_CACHE = 'rackbuilder-v15';
+const EXPECTED_CACHE = 'rackbuilder-v16';
 const CACHE_PREFIX = 'rackbuilder-v';
 
 /**

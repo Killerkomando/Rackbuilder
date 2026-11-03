@@ -454,15 +454,13 @@
     <div id="mi-if-actions">
       <div class="mi-toolbar">
         <button type="button" class="btn btn-secondary" id="mi-if-api-btn" data-i18n="mi_if_api_btn">Fetch from NetBox API</button>
-        <button type="button" class="btn btn-secondary" id="mi-if-file-btn" data-i18n="mi_if_file_btn">Upload interface export (CSV)</button>
         <input type="file" id="mi-if-file" accept=".csv,.tsv,.txt" style="display:none">
       </div>
-      <p class="settings-section-desc" data-i18n="mi_if_api_hint">The API option uses the URL and token from Settings → NetBox and needs CORS to be allowed. The file upload always works: export the interfaces (with the ID column) from NetBox.</p>
+      <p class="settings-section-desc" data-i18n="mi_if_api_hint">The API option uses the URL and token from Settings → NetBox and needs CORS to be allowed. The file upload always works: export the ports (with the ID column) from NetBox (Devices → Front Ports / Rear Ports / Interfaces).</p>
     </div>
-    <div id="mi-if-result"></div>
+    <div id="mi-if-kinds"></div>
     <div class="mi-toolbar">
-      <button type="button" class="btn btn-success" id="mi-if-download" disabled data-i18n="mi_if_download">Download interface-rename.csv</button>
-      <button type="button" class="btn btn-secondary" id="mi-if-zip" disabled data-i18n="mi_if_zip">Download both as ZIP</button>
+      <button type="button" class="btn btn-secondary" id="mi-if-zip" disabled data-i18n="mi_if_zip">Download all as ZIP</button>
     </div>
     <div class="mi-actions">
       <button type="button" class="btn btn-secondary" id="mi-if-back" data-i18n="mi_ex_back">Back</button>

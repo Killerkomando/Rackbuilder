@@ -1,7 +1,7 @@
 // NetBox module import engine: CSV table + profile → devices with module-bay assignments.
 // Pure logic (no DOM, no storage) so it can be tested in Node.
 
-import { moduleSizeFor, fillPattern, NAME_MODIFIERS, parsePlaceholder } from './import-profiles.js';
+import { moduleSizeFor, fillPattern, NAME_MODIFIERS, parsePlaceholder, PORT_KINDS, DEFAULT_PORT_TEMPLATE } from './import-profiles.js';
 
 export const MODULE_IMPORT_HEADERS = ['device', 'module_bay', 'module_type', 'status', 'replicate_components'];
 export const DEVICE_IMPORT_BASE_HEADERS = ['name', 'role', 'manufacturer', 'device_type', 'site', 'status'];
@@ -420,10 +420,11 @@ export function buildDeviceImportRows(devices, profile) {
 }
 
 /**
- * Interfaces NetBox will create for LAN modules, with the target name from the source file.
+ * Ports NetBox will create for LAN modules (interfaces, front ports or rear ports), with the target name from the source file.
  * @returns {Array<{device:string, bay:number, expected:string, newName:string}>}
  */
-export function expectedInterfaces(devices, profile) {
+export function expectedPorts(devices, profile, kind = 'interface') {
+  const template = profile[PORT_KINDS[kind].template] || DEFAULT_PORT_TEMPLATE;
   const out = [];
   for (const d of devices) {
     for (const b of d.bays) {
@@ -432,13 +433,18 @@ export function expectedInterfaces(devices, profile) {
         out.push({
           device: d.name,
           bay: b.bay,
-          expected: fillPattern(profile.interface_name_template || 'Gi{module}/0/{n}', { module: b.bay, n: i + 1 }),
+          expected: fillPattern(template, { module: b.bay, n: i + 1 }),
           newName: portName,
         });
       });
     }
   }
   return out;
+}
+
+/** Interfaces NetBox will create for LAN modules (see expectedPorts). */
+export function expectedInterfaces(devices, profile) {
+  return expectedPorts(devices, profile, 'interface');
 }
 
 /**
@@ -462,7 +468,7 @@ export function readInterfaceTable(table) {
  * Match expected interfaces to NetBox interfaces (device + name) and build the rename rows.
  * @returns {{rows: Array<{id:string,name:string}>, unmatched: object[], unchanged: number}}
  */
-export function buildInterfaceRename(devices, profile, interfaces) {
+export function buildInterfaceRename(devices, profile, interfaces, kind = 'interface') {
   const byKey = new Map();
   for (const i of interfaces) {
     const key = `${i.device}\u0000${i.name}`;
@@ -471,7 +477,7 @@ export function buildInterfaceRename(devices, profile, interfaces) {
   const rows = [];
   const unmatched = [];
   let unchanged = 0;
-  for (const e of expectedInterfaces(devices, profile)) {
+  for (const e of expectedPorts(devices, profile, kind)) {
     const hit = byKey.get(`${e.device}\u0000${e.expected}`);
     if (!hit) { unmatched.push(e); continue; }
     if (hit.name === e.newName) { unchanged++; continue; }
